@@ -27,7 +27,7 @@ set(AVR_UPLOADTOOL avrdude)
 set(AVR_PROGRAMMER avrispmkII)
 set(AVR_UPLOADTOOL_PORT usb)
 # AVR and fuses needs to be set
-set(AVR_MCU atmega328p)
+set(AVR_MCU atmega1284p)
 set(AVR_H_FUSE 0xd9)
 set(AVR_L_FUSE 0xc3)
 
@@ -36,8 +36,8 @@ set(AVR_L_FUSE 0xc3)
 ##########################################################################
 # name your project
 ##########################################################################
-project(LedController)
-set(SOURCE_FILES main.c)
+project(LedController C ASM)
+set(SOURCE_FILES main.c ws2812b_fan.s ws2812b_strip.s eeprom.h)
 
 ##################################################################################
 # status messages
@@ -119,7 +119,7 @@ add_definitions("-DF_CPU=${MCU_SPEED}")
 add_definitions("-fpack-struct")
 add_definitions("-fshort-enums")
 add_definitions("-Wall")
-add_definitions("-Werror")
+# add_definitions("-Werror")
 # http://gcc.gnu.org/onlinedocs/gcc-4.8.2/gcc/Alternate-Keywords.html#Alternate-Keywords
 # [...]-pedantic and other options cause warnings for many GNU C extensions. You can prevent such warnings within
 # one expression by writing __extension__ before the expression. __extension__ has no effect aside from this.[...] 
