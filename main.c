@@ -1,50 +1,67 @@
 #include <avr/io.h>
-#include <util/delay.h>
-#include "eeprom.h"
+#include <avr/interrupt.h>
+#include "color_utils.h"
 
-#define PIN 0
-#define POUT 1
-
-struct device_profile
-{
-    uint8_t mode;
-    uint8_t color_count;
-    uint8_t timing[4];
-    uint8_t args[4];
-    uint8_t colors[16 * 3];
-};
-
-struct profile
-{
-    uint8_t name[30];
-    struct device_profile devices[5];
-};
-
-extern void output_grb_fan(uint8_t *ptr, uint16_t count);
+#define LED_COUNT 4
 
 extern void output_grb_strip(uint8_t *ptr, uint16_t count);
 
-void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b)
+uint8_t strip_buf[LED_COUNT * 3];
+volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
+
+void update()
 {
-    uint16_t index = 3 * led;
-    p_buf[index++] = g;
-    p_buf[index++] = r;
-    p_buf[index] = b;
+    output_grb_strip(strip_buf, sizeof(strip_buf));
 }
 
 void init()
 {
-    //PC2 and PC5 set to output for digital LEDs, PC3 set to input for profile switch
-    DDRC |= (POUT << PC2) | (POUT << PC5) & ~(PIN << PC3);
-    TCCR0A |= (1 << WGM00) | (1 << WGM01);
+    DDRD |= (1 << PD2);
+    TCCR1B |= (1 << WGM12);  /* Set timer1 to CTC mode */
+    TIMSK1 |= (1 << OCIE1A); /* Enable timer1 clear interrupt */
+    sei();                   /* Enable global interrupts */
+    OCR1A = 977;            /* Set timer1 A register to reset every 1/64s */
+    TCCR1B |= (1 << CS12); /* Set the timer1 prescaler to 256 */
 }
 
 int main(void)
 {
-    uint8_t led_count = 12;
-    uint8_t fan[led_count * 3];
+    init();
+
+    uint8_t color[3];
+    uint16_t times[] = {0, 32, 0, 32};
+    uint8_t colors[48];
+    colors[0] = 255;
+    colors[1] = 0;
+    colors[2] = 0;
+
+    colors[3] = 0;
+    colors[4] = 255;
+    colors[5] = 0;
+
+    colors[6] = 0;
+    colors[7] = 0;
+    colors[8] = 255;
+
+    colors[9] = 255;
+    colors[10] = 255;
+    colors[11] = 255;
+    uint32_t previous_frame = 1;
+
     while(1)
     {
-        _delay_ms(1000);
+        if(previous_frame != frame)
+        {
+            previous_frame = frame;
+            breathing(color, frame, times, colors, 4);
+            set_all_colors(strip_buf, actual_brightness(color[0]), actual_brightness(color[1]), actual_brightness(color[2]), LED_COUNT);
+            output_grb_strip(strip_buf, sizeof(strip_buf));
+        }
     }
+}
+
+ISR(TIMER1_COMPA_vect)
+{
+    frame++;
+    update();
 }

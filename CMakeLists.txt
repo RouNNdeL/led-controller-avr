@@ -24,12 +24,12 @@ cmake_minimum_required(VERSION 2.8)
 # tools to be used for programming the AVR
 ##################################################################################
 set(AVR_UPLOADTOOL avrdude)
-set(AVR_PROGRAMMER avrispmkII)
-set(AVR_UPLOADTOOL_PORT usb)
+set(AVR_PROGRAMMER arduino)
+set(AVR_UPLOADTOOL_PORT COM8)
 # AVR and fuses needs to be set
-set(AVR_MCU atmega1284p)
-set(AVR_H_FUSE 0xd9)
-set(AVR_L_FUSE 0xc3)
+set(AVR_MCU atmega328p)
+set(AVR_H_FUSE 0xde)
+set(AVR_L_FUSE 0xff)
 
 ### END TOOLCHAIN SETUP AREA #############################################
 
@@ -37,7 +37,7 @@ set(AVR_L_FUSE 0xc3)
 # name your project
 ##########################################################################
 project(LedController C ASM)
-set(SOURCE_FILES main.c ws2812b_fan.s ws2812b_strip.s eeprom.h)
+set(SOURCE_FILES main.c color_utils.c ws2812b_strip.S)
 
 ##################################################################################
 # status messages
@@ -139,6 +139,7 @@ add_avr_executable(
         ${SOURCE_FILES}
 )
 
+add_avr_utils()
 ##################################################################################
 # add AVR library
 ##################################################################################

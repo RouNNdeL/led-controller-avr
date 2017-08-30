@@ -1,10 +1,11 @@
-#ifndef LEDCONTROLLER_EEPROM_H
-#    define LEDCONTROLLER_EEPROM_H
+#include <avr/io.h>
 
-#endif //LEDCONTROLLER_EEPROM_H
+#ifndef LEDCONTROLLER_EEPROM_H
+#define LEDCONTROLLER_EEPROM_H
+
 #ifndef __AVR_ATmega1284P__
 #    error "This memory locations are only valid for an ATmega1284P"
-#else
+#endif
 
 #define PROFILES_OFFSET 0xFF
 #define PROFILE_LENGTH 0x140
@@ -19,3 +20,20 @@
 #define ARGS_OFFSET 0x06
 #define COLORS_OFFSET 0x0A
 #define COLOR_LENGTH 0x03
+
+typedef struct
+{
+    uint8_t mode;
+    uint8_t color_count;
+    uint8_t timing[4];
+    uint8_t args[4];
+    uint8_t colors[16 * 3];
+} device_profile;
+
+typedef struct
+{
+    uint8_t name[30];
+    device_profile devices[5];
+} profile;
+
+#endif //LEDCONTROLLER_EEPROM_H
