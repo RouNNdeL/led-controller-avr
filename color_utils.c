@@ -1,6 +1,5 @@
 #include <avr/io.h>
-
-typedef enum {BREATHE, FADE} effect;
+#include "color_utils.h"
 
 uint8_t actual_brightness(uint8_t brightness)
 {
@@ -10,8 +9,8 @@ uint8_t actual_brightness(uint8_t brightness)
 void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b)
 {
     uint16_t index = 3 * led;
-    p_buf[index++] = g;
     p_buf[index++] = r;
+    p_buf[index++] = g;
     p_buf[index] = b;
 }
 
@@ -25,6 +24,7 @@ void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t cou
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
+
 /**
  * @param effect - effect to calculate
  * @param color - an array of length 3 that the color is going to be assigned to
@@ -40,7 +40,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
     uint32_t sum = times[0] + times[1] + times[2] + times[3];
     uint32_t d_time = frame % sum;
     uint8_t n_color = ((frame / sum) % color_count);
-    uint8_t m_color = (n_color == color_count-1) ? 0 : n_color+1;
+    uint8_t m_color = (n_color == color_count - 1) ? 0 : n_color + 1;
     n_color *= 3;
     m_color *= 3;
 
@@ -66,19 +66,19 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
         else if(effect == FADE)
         {
             if(colors[n_color] > colors[m_color])
-                color[0] = colors[n_color] - (colors[n_color++] -  colors[m_color++]) * progress;
+                color[0] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * progress;
             else
-                color[0] = colors[n_color] + (colors[m_color++] -  colors[n_color++]) * progress;
+                color[0] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * progress;
 
             if(colors[n_color] > colors[m_color])
-                color[1] = colors[n_color] - (colors[n_color++] -  colors[m_color++]) * progress;
+                color[1] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * progress;
             else
-                color[1] = colors[n_color] + (colors[m_color++] -  colors[n_color++]) * progress;
+                color[1] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * progress;
 
             if(colors[n_color] > colors[m_color])
-                color[2] = colors[n_color] - (colors[n_color] -  colors[m_color]) * progress;
+                color[2] = colors[n_color] - (colors[n_color] - colors[m_color]) * progress;
             else
-                color[2] = colors[n_color] + (colors[m_color] -  colors[n_color]) * progress;
+                color[2] = colors[n_color] + (colors[m_color] - colors[n_color]) * progress;
         }
     }
     else if((d_time -= times[1]) < times[2])
@@ -98,7 +98,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
     }
     else if((d_time -= times[2]) < times[3])
     {
-        float progress = 1-((float) d_time / (float) times[3]);
+        float progress = 1 - ((float) d_time / (float) times[3]);
 
         if(effect == BREATHE)
         {
@@ -108,4 +108,57 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
         }
     }
 }
+
 #pragma clang diagnostic pop
+
+void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uint32_t frame,
+                uint16_t *times, uint8_t *colors, uint8_t color_count)
+{
+    uint32_t sum = times[0] + times[1] + times[2] + times[3];
+    uint32_t d_time = frame % sum;
+    uint8_t n_color = ((frame / sum) % color_count);
+    uint8_t m_color = (n_color == color_count - 1) ? 0 : n_color + 1;
+    n_color *= 3;
+    //m_color *= 3;
+
+    leds += offset;
+
+    if((d_time) < times[0])
+    {
+        set_all_colors(leds, 0x00, 0x00, 0x00, count);
+    }
+    else if((d_time -= times[0]) < times[1])
+    {
+        float progress = (float) d_time / (float) times[1];
+
+        if(effect == FILL)
+        {
+            for(uint8_t i = 0; i < progress * count; i += 1)
+            {
+                uint8_t index = i * 3;
+                leds[index] = colors[n_color];
+                leds[index + 1] = colors[n_color + 1];
+                leds[index + 2] = colors[n_color + 2];
+            }
+        }
+    }
+    else if((d_time -= times[1]) < times[2])
+    {
+        set_all_colors(leds, colors[n_color], colors[n_color + 1], colors[n_color + 2], count);
+    }
+    else if((d_time -= times[2]) < times[3])
+    {
+        float progress = 1 - ((float) d_time / (float) times[3]);
+
+        if(effect == FILL)
+        {
+            for(uint8_t i = 0; i < (1-progress)*count; ++i)
+            {
+                uint8_t index = i * 3;
+                leds[index] = 0x00;
+                leds[index + 1] = 0x00;
+                leds[index + 2] = 0x00;
+            }
+        }
+    }
+}
