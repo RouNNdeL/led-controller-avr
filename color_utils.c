@@ -133,12 +133,23 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
 
         if(effect == FILL)
         {
-            for(uint8_t i = 0; i < (progress * (uint32_t) count + UINT16_MAX/2) / UINT16_MAX; i += 1)
+            uint8_t count_on = (progress * (uint32_t) count + UINT16_MAX/2) / UINT16_MAX;
+
+            for(uint8_t i = 0; i < count; i += 1)
             {
                 uint8_t index = i * 3;
-                leds[index] = colors[n_color];
-                leds[index + 1] = colors[n_color + 1];
-                leds[index + 2] = colors[n_color + 2];
+                if(i <= count_on)
+                {
+                    leds[index] = colors[n_color];
+                    leds[index + 1] = colors[n_color + 1];
+                    leds[index + 2] = colors[n_color + 2];
+                }
+                else
+                {
+                    leds[index] = 0x00;
+                    leds[index + 1] = 0x00;
+                    leds[index + 2] = 0x00;
+                }
             }
         }
     }
@@ -152,12 +163,24 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
 
         if(effect == FILL)
         {
-            for(uint8_t i = 0; i < (progress * (uint32_t) count + UINT16_MAX/2) / UINT16_MAX; ++i)
+            uint8_t count_on = (progress * (uint32_t) count + UINT16_MAX/2) / UINT16_MAX;
+
+            for(uint8_t i = 0; i < count; ++i)
             {
                 uint8_t index = i * 3;
-                leds[index] = 0x00;
-                leds[index + 1] = 0x00;
-                leds[index + 2] = 0x00;
+
+                if(i > count_on)
+                {
+                    leds[index] = colors[n_color];
+                    leds[index + 1] = colors[n_color + 1];
+                    leds[index + 2] = colors[n_color + 2];
+                }
+                else
+                {
+                    leds[index] = 0x00;
+                    leds[index + 1] = 0x00;
+                    leds[index + 2] = 0x00;
+                }
             }
         }
     }
