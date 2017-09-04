@@ -133,7 +133,7 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
 
         if(effect == FILL)
         {
-            for(uint8_t i = 0; i < progress * (uint32_t) count / UINT16_MAX; i += 1)
+            for(uint8_t i = 0; i < (progress * (uint32_t) count + UINT16_MAX/2) / UINT16_MAX; i += 1)
             {
                 uint8_t index = i * 3;
                 leds[index] = colors[n_color];
@@ -152,7 +152,7 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
 
         if(effect == FILL)
         {
-            for(uint8_t i = 0; i < progress * (uint32_t) count / UINT16_MAX; ++i)
+            for(uint8_t i = 0; i < (progress * (uint32_t) count + UINT16_MAX/2) / UINT16_MAX; ++i)
             {
                 uint8_t index = i * 3;
                 leds[index] = 0x00;
