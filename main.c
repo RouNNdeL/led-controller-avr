@@ -29,10 +29,10 @@ int main(void)
     init();
 
     uint8_t color[3];
-    uint16_t times[] = {0, 32, 0, 0};
+    uint16_t times[] = {0, 32, 0, 32};
     uint8_t colors[48];
 
-    uint8_t brightness = 255;
+    uint8_t brightness = 10;
     colors[0] = brightness;
     colors[1] = 0;
     colors[2] = 0;

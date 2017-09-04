@@ -55,30 +55,30 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
     }
     else if((d_time -= times[0]) < times[1])
     {
-        float progress = (float) d_time / (float) times[1];
+        uint16_t progress  = d_time * UINT16_MAX  / times[1];
 
         if(effect == BREATHE)
         {
-            color[0] = colors[n_color++] * progress;
-            color[1] = colors[n_color++] * progress;
-            color[2] = colors[n_color] * progress;
+            color[0] = colors[n_color++] * (uint32_t) progress / UINT16_MAX;
+            color[1] = colors[n_color++] * (uint32_t) progress / UINT16_MAX;
+            color[2] = colors[n_color] * (uint32_t) progress / UINT16_MAX;
         }
         else if(effect == FADE)
         {
             if(colors[n_color] > colors[m_color])
-                color[0] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * progress;
+                color[0] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * (uint32_t) progress / UINT16_MAX;
             else
-                color[0] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * progress;
+                color[0] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * (uint32_t) progress / UINT16_MAX;
 
             if(colors[n_color] > colors[m_color])
-                color[1] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * progress;
+                color[1] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * (uint32_t) progress / UINT16_MAX;
             else
-                color[1] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * progress;
+                color[1] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * (uint32_t) progress / UINT16_MAX;
 
             if(colors[n_color] > colors[m_color])
-                color[2] = colors[n_color] - (colors[n_color] - colors[m_color]) * progress;
+                color[2] = colors[n_color] - (colors[n_color] - colors[m_color]) * (uint32_t) progress / UINT16_MAX;
             else
-                color[2] = colors[n_color] + (colors[m_color] - colors[n_color]) * progress;
+                color[2] = colors[n_color] + (colors[m_color] - colors[n_color]) * (uint32_t) progress / UINT16_MAX;
         }
     }
     else if((d_time -= times[1]) < times[2])
@@ -98,13 +98,13 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
     }
     else if((d_time -= times[2]) < times[3])
     {
-        float progress = 1 - ((float) d_time / (float) times[3]);
+        uint16_t progress = UINT16_MAX - d_time * UINT16_MAX /times[3];
 
         if(effect == BREATHE)
         {
-            color[0] = colors[n_color++] * progress;
-            color[1] = colors[n_color++] * progress;
-            color[2] = colors[n_color] * progress;
+            color[0] = colors[n_color++] * (uint32_t) progress / UINT16_MAX;
+            color[1] = colors[n_color++] * (uint32_t) progress / UINT16_MAX;
+            color[2] = colors[n_color] * (uint32_t) progress / UINT16_MAX;
         }
     }
 }
@@ -129,11 +129,11 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
     }
     else if((d_time -= times[0]) < times[1])
     {
-        float progress = (float) d_time / (float) times[1];
+        uint16_t progress = d_time * UINT16_MAX / times[1];
 
         if(effect == FILL)
         {
-            for(uint8_t i = 0; i < progress * count; i += 1)
+            for(uint8_t i = 0; i < progress * (uint32_t) count / UINT16_MAX; i += 1)
             {
                 uint8_t index = i * 3;
                 leds[index] = colors[n_color];
@@ -148,11 +148,11 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
     }
     else if((d_time -= times[2]) < times[3])
     {
-        float progress = 1 - ((float) d_time / (float) times[3]);
+        uint16_t progress = d_time * UINT16_MAX / times[3];
 
         if(effect == FILL)
         {
-            for(uint8_t i = 0; i < (1-progress)*count; ++i)
+            for(uint8_t i = 0; i < progress * (uint32_t) count / UINT16_MAX; ++i)
             {
                 uint8_t index = i * 3;
                 leds[index] = 0x00;
