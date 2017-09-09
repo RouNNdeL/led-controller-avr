@@ -1,12 +1,12 @@
 #ifndef LEDCONTROLLER_COLOR_UTILS_H
 #define LEDCONTROLLER_COLOR_UTILS_H
 
+#define actual_brightness(brightness) (brightness * brightness) / 255;
+
 typedef enum
 {
     BREATHE, FADE, FILL
 } effect;
-
-uint8_t actual_brightness(uint8_t brightness);
 
 void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t count);
 

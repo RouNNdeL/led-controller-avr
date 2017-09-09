@@ -29,11 +29,23 @@ int main(void)
     init();
 
     uint8_t color[3];
-    uint16_t times[] = {32, 32, 32, 32};
+    uint16_t times[] = {0, 0, 32, 32};
     uint8_t colors[48];
 
-    uint8_t brightness = 10;
+    uint8_t brightness = 255;
+
     colors[0] = brightness;
+    colors[1] = 0;
+    colors[2] = 0;
+
+    colors[3] = 0;
+    colors[4] = brightness;
+    colors[5] = 0;
+
+    colors[6] = 0;
+    colors[7] = 0;
+    colors[8] = brightness;
+    /*colors[0] = brightness;
     colors[1] = 0;
     colors[2] = 0;
 
@@ -55,7 +67,7 @@ int main(void)
 
     colors[15] = brightness;
     colors[16] = 0;
-    colors[17] = brightness;
+    colors[17] = brightness;*/
 
     uint32_t previous_frame = 1;
 
@@ -65,7 +77,7 @@ int main(void)
         {
             previous_frame = frame;
             //simple_effect(BREATHE, color, frame, times, colors, 4);
-            adv_effect(FILL, strip_buf, LED_COUNT, 0, frame, times, colors, 6);
+            adv_effect(FADE, strip_buf, LED_COUNT, 0, frame, times, colors, 3);
             //set_all_colors(strip_buf, actual_brightness(color[0]), actual_brightness(color[1]), actual_brightness(color[2]), LED_COUNT);
         }
     }

@@ -1,17 +1,12 @@
 #include <avr/io.h>
 #include "color_utils.h"
 
-uint8_t actual_brightness(uint8_t brightness)
-{
-    return (brightness * brightness) / 255;
-}
-
 void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b)
 {
     uint16_t index = 3 * led;
-    p_buf[index++] = r;
-    p_buf[index++] = g;
-    p_buf[index] = b;
+    p_buf[index++] = actual_brightness(r);
+    p_buf[index++] = actual_brightness(g);
+    p_buf[index] = actual_brightness(b);
 }
 
 void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t count)
@@ -138,16 +133,27 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
 
         if(effect == FILL)
         {
-            uint8_t count_on = (progress * (uint32_t) count + UINT16_MAX / 2) / UINT16_MAX;
+            uint16_t led_progress = (progress * (uint32_t) count) / UINT8_MAX;
 
-            for(uint8_t i = 0; i < count; i += 1)
+            for(uint8_t i = 0; i < count; ++i)
             {
                 uint8_t index = i * 3;
-                if(i <= count_on)
+
+                if(led_progress >= UINT8_MAX)
                 {
                     leds[index] = colors[n_color];
                     leds[index + 1] = colors[n_color + 1];
                     leds[index + 2] = colors[n_color + 2];
+
+                    led_progress -= UINT8_MAX;
+                }
+                else if(led_progress > 0)
+                {
+                    leds[index] = colors[n_color] * led_progress / UINT8_MAX;
+                    leds[index + 1] = colors[n_color + 1] * led_progress / UINT8_MAX;
+                    leds[index + 2] = colors[n_color + 2] * led_progress / UINT8_MAX;
+
+                    led_progress = 0;
                 }
                 else
                 {
@@ -164,15 +170,15 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
     }
     else if((d_time -= times[2]) < times[3])
     {
-        uint16_t progress = d_time * UINT16_MAX / times[3];
+        uint16_t progress = UINT16_MAX - d_time * UINT16_MAX / times[3];
 
         if(effect == FILL || effect == FADE)
         {
-            uint8_t led_progress = (progress * (uint32_t) count + UINT16_MAX / 2) / UINT8_MAX;
+            uint16_t led_progress = (progress * (uint32_t) count) / UINT8_MAX;
 
             for(uint8_t i = 0; i < count; ++i)
             {
-                uint8_t index = i * 3;
+                uint8_t index = (count - i - 1) * 3;
 
                 if(led_progress >= UINT8_MAX)
                 {
@@ -192,7 +198,7 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
                     }
                     else
                     {
-                        cross_fade(leds+index, colors, n_color, m_color, led_progress*UINT8_MAX);
+                        cross_fade(leds + index, colors, m_color, n_color, led_progress * UINT8_MAX);
                     }
 
                     led_progress = 0;
