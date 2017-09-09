@@ -22,6 +22,24 @@ void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t cou
     }
 }
 
+void cross_fade(uint8_t *color, uint8_t *colors, uint8_t n_color, uint8_t m_color, uint16_t progress)
+{
+    if(colors[n_color] > colors[m_color])
+        color[0] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * (uint32_t) progress / UINT16_MAX;
+    else
+        color[0] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * (uint32_t) progress / UINT16_MAX;
+
+    if(colors[n_color] > colors[m_color])
+        color[1] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * (uint32_t) progress / UINT16_MAX;
+    else
+        color[1] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * (uint32_t) progress / UINT16_MAX;
+
+    if(colors[n_color] > colors[m_color])
+        color[2] = colors[n_color] - (colors[n_color] - colors[m_color]) * (uint32_t) progress / UINT16_MAX;
+    else
+        color[2] = colors[n_color] + (colors[m_color] - colors[n_color]) * (uint32_t) progress / UINT16_MAX;
+}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
 
@@ -55,7 +73,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
     }
     else if((d_time -= times[0]) < times[1])
     {
-        uint16_t progress  = d_time * UINT16_MAX  / times[1];
+        uint16_t progress = d_time * UINT16_MAX / times[1];
 
         if(effect == BREATHE)
         {
@@ -65,20 +83,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
         }
         else if(effect == FADE)
         {
-            if(colors[n_color] > colors[m_color])
-                color[0] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * (uint32_t) progress / UINT16_MAX;
-            else
-                color[0] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * (uint32_t) progress / UINT16_MAX;
-
-            if(colors[n_color] > colors[m_color])
-                color[1] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * (uint32_t) progress / UINT16_MAX;
-            else
-                color[1] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * (uint32_t) progress / UINT16_MAX;
-
-            if(colors[n_color] > colors[m_color])
-                color[2] = colors[n_color] - (colors[n_color] - colors[m_color]) * (uint32_t) progress / UINT16_MAX;
-            else
-                color[2] = colors[n_color] + (colors[m_color] - colors[n_color]) * (uint32_t) progress / UINT16_MAX;
+            cross_fade(color, colors, n_color, m_color, progress);
         }
     }
     else if((d_time -= times[1]) < times[2])
@@ -98,7 +103,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
     }
     else if((d_time -= times[2]) < times[3])
     {
-        uint16_t progress = UINT16_MAX - d_time * UINT16_MAX /times[3];
+        uint16_t progress = UINT16_MAX - d_time * UINT16_MAX / times[3];
 
         if(effect == BREATHE)
         {
@@ -119,7 +124,7 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
     uint8_t n_color = ((frame / sum) % color_count);
     uint8_t m_color = (n_color == color_count - 1) ? 0 : n_color + 1;
     n_color *= 3;
-    //m_color *= 3;
+    m_color *= 3;
 
     leds += offset;
 
@@ -133,7 +138,7 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
 
         if(effect == FILL)
         {
-            uint8_t count_on = (progress * (uint32_t) count + UINT16_MAX/2) / UINT16_MAX;
+            uint8_t count_on = (progress * (uint32_t) count + UINT16_MAX / 2) / UINT16_MAX;
 
             for(uint8_t i = 0; i < count; i += 1)
             {
@@ -161,25 +166,51 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
     {
         uint16_t progress = d_time * UINT16_MAX / times[3];
 
-        if(effect == FILL)
+        if(effect == FILL || effect == FADE)
         {
-            uint8_t count_on = (progress * (uint32_t) count + UINT16_MAX/2) / UINT16_MAX;
+            uint8_t led_progress = (progress * (uint32_t) count + UINT16_MAX / 2) / UINT8_MAX;
 
             for(uint8_t i = 0; i < count; ++i)
             {
                 uint8_t index = i * 3;
 
-                if(i > count_on)
+                if(led_progress >= UINT8_MAX)
                 {
                     leds[index] = colors[n_color];
                     leds[index + 1] = colors[n_color + 1];
                     leds[index + 2] = colors[n_color + 2];
+
+                    led_progress -= UINT8_MAX;
+                }
+                else if(led_progress > 0)
+                {
+                    if(effect == FILL)
+                    {
+                        leds[index] = colors[n_color] * led_progress / UINT8_MAX;
+                        leds[index + 1] = colors[n_color + 1] * led_progress / UINT8_MAX;
+                        leds[index + 2] = colors[n_color + 2] * led_progress / UINT8_MAX;
+                    }
+                    else
+                    {
+                        cross_fade(leds+index, colors, n_color, m_color, led_progress*UINT8_MAX);
+                    }
+
+                    led_progress = 0;
                 }
                 else
                 {
-                    leds[index] = 0x00;
-                    leds[index + 1] = 0x00;
-                    leds[index + 2] = 0x00;
+                    if(effect == FILL)
+                    {
+                        leds[index] = 0x00;
+                        leds[index + 1] = 0x00;
+                        leds[index + 2] = 0x00;
+                    }
+                    else
+                    {
+                        leds[index] = colors[m_color];
+                        leds[index + 1] = colors[m_color + 1];
+                        leds[index + 2] = colors[m_color + 2];
+                    }
                 }
             }
         }

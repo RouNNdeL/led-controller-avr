@@ -20,8 +20,8 @@ void init()
     TCCR1B |= (1 << WGM12);  /* Set timer1 to CTC mode */
     TIMSK1 |= (1 << OCIE1A); /* Enable timer1 clear interrupt */
     sei();                   /* Enable global interrupts */
-    OCR1A = 977;            /* Set timer1 A register to reset every 1/64s */
-    TCCR1B |= (1 << CS12); /* Set the timer1 prescaler to 256 */
+    OCR1A = 977;             /* Set timer1 A register to reset every 1/64s */
+    TCCR1B |= (1 << CS12);   /* Set the timer1 prescaler to 256 */
 }
 
 int main(void)
@@ -29,7 +29,7 @@ int main(void)
     init();
 
     uint8_t color[3];
-    uint16_t times[] = {0, 32, 0, 32};
+    uint16_t times[] = {32, 32, 32, 32};
     uint8_t colors[48];
 
     uint8_t brightness = 10;
