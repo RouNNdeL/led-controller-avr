@@ -74,9 +74,9 @@ void rainbow_at_progress_full(uint8_t *color, uint16_t progress, uint8_t brightn
         color[2] = 0;
     }
 
-    color[0] = color[0]*brightness/UINT8_MAX;
-    color[1] = color[1]*brightness/UINT8_MAX;
-    color[2] = color[2]*brightness/UINT8_MAX;
+    color[0] = color[0] * brightness / UINT8_MAX;
+    color[1] = color[1] * brightness / UINT8_MAX;
+    color[2] = color[2] * brightness / UINT8_MAX;
 }
 
 void rainbow_at_progress(uint8_t *color, uint16_t progress, uint8_t brightness)
@@ -103,9 +103,9 @@ void rainbow_at_progress(uint8_t *color, uint16_t progress, uint8_t brightness)
         color[2] = 0;
     }
 
-    color[0] = color[0]*brightness/UINT8_MAX;
-    color[1] = color[1]*brightness/UINT8_MAX;
-    color[2] = color[2]*brightness/UINT8_MAX;
+    color[0] = color[0] * brightness / UINT8_MAX;
+    color[1] = color[1] * brightness / UINT8_MAX;
+    color[2] = color[2] * brightness / UINT8_MAX;
 }
 
 
@@ -207,44 +207,38 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
 
         if(effect == FILL || effect == RAINBOW)
         {
-            uint16_t led_progress = effect == FILL ? (progress * (uint32_t) count) / UINT8_MAX : UINT16_MAX / count;;
+            uint16_t led_progress = (progress * (uint32_t) count) / UINT8_MAX;
 
             for(uint8_t i = 0; i < count; ++i)
             {
-                uint8_t index = args[0] ? i*3 : (count - i - 1) * 3;
+                uint8_t index = args[0] ? i * 3 : (count - i - 1) * 3;
 
-                if(effect == FILL)
+                if(led_progress >= UINT8_MAX)
                 {
-                    if(led_progress >= UINT8_MAX)
-                    {
-                        leds[index] = colors[n_color];
-                        leds[index + 1] = colors[n_color + 1];
-                        leds[index + 2] = colors[n_color + 2];
+                    leds[index] = colors[n_color];
+                    leds[index + 1] = colors[n_color + 1];
+                    leds[index + 2] = colors[n_color + 2];
 
-                        led_progress -= UINT8_MAX;
-                    }
-                    else if(led_progress > 0)
-                    {
-                        leds[index] = colors[n_color] * led_progress / UINT8_MAX;
-                        leds[index + 1] = colors[n_color + 1] * led_progress / UINT8_MAX;
-                        leds[index + 2] = colors[n_color + 2] * led_progress / UINT8_MAX;
 
-                        led_progress = 0;
-                    }
-                    else
-                    {
-                        leds[index] = 0x00;
-                        leds[index + 1] = 0x00;
-                        leds[index + 2] = 0x00;
-                    }
+                    led_progress -= UINT8_MAX;
+                }
+                else if(led_progress > 0)
+                {
+
+                    leds[index] = colors[n_color] * led_progress / UINT8_MAX;
+                    leds[index + 1] = colors[n_color + 1] * led_progress / UINT8_MAX;
+                    leds[index + 2] = colors[n_color + 2] * led_progress / UINT8_MAX;
+
+
+                    led_progress = 0;
                 }
                 else
                 {
-                    if(args[2])
-                        rainbow_at_progress_full(leds+index, (progress+i*led_progress)*args[3]%UINT16_MAX, args[1]);
-                    else
-                        rainbow_at_progress(leds+index, (progress+i*led_progress)*args[3]%UINT16_MAX, args[1]);
+                    leds[index] = 0x00;
+                    leds[index + 1] = 0x00;
+                    leds[index + 2] = 0x00;
                 }
+
             }
         }
     }
@@ -256,51 +250,65 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
     {
         uint16_t progress = UINT16_MAX - d_time * UINT16_MAX / times[3];
 
-        if(effect == FILL || effect == FADE)
+        if(effect == FILL || effect == FADE || effect == RAINBOW)
         {
-            uint16_t led_progress = (progress * (uint32_t) count) / UINT8_MAX;
+            uint16_t led_progress = effect != RAINBOW ?
+                                    (progress * (uint32_t) count) / UINT8_MAX :
+                                    UINT16_MAX / count;
 
             for(uint8_t i = 0; i < count; ++i)
             {
-                uint8_t index = args[0] ? (count - i - 1) * 3 : i*3;
+                uint8_t index = args[0] ? (count - i - 1) * 3 : i * 3;
+                uint8_t alt_index = args[0] ? i * 3 : (count - i - 1) * 3;
 
-                if(led_progress >= UINT8_MAX)
+                if(effect != RAINBOW)
                 {
-                    leds[index] = colors[n_color];
-                    leds[index + 1] = colors[n_color + 1];
-                    leds[index + 2] = colors[n_color + 2];
-
-                    led_progress -= UINT8_MAX;
-                }
-                else if(led_progress > 0)
-                {
-                    if(effect == FILL)
+                    if(led_progress >= UINT8_MAX)
                     {
-                        leds[index] = colors[n_color] * led_progress / UINT8_MAX;
-                        leds[index + 1] = colors[n_color + 1] * led_progress / UINT8_MAX;
-                        leds[index + 2] = colors[n_color + 2] * led_progress / UINT8_MAX;
+                        leds[index] = colors[n_color];
+                        leds[index + 1] = colors[n_color + 1];
+                        leds[index + 2] = colors[n_color + 2];
+
+                        led_progress -= UINT8_MAX;
+                    }
+                    else if(led_progress > 0)
+                    {
+                        if(effect == FILL)
+                        {
+                            leds[index] = colors[n_color] * led_progress / UINT8_MAX;
+                            leds[index + 1] = colors[n_color + 1] * led_progress / UINT8_MAX;
+                            leds[index + 2] = colors[n_color + 2] * led_progress / UINT8_MAX;
+                        }
+                        else
+                        {
+                            cross_fade(leds + index, colors, m_color, n_color, led_progress * UINT8_MAX);
+                        }
+
+                        led_progress = 0;
                     }
                     else
                     {
-                        cross_fade(leds + index, colors, m_color, n_color, led_progress * UINT8_MAX);
+                        if(effect == FILL)
+                        {
+                            leds[index] = 0x00;
+                            leds[index + 1] = 0x00;
+                            leds[index + 2] = 0x00;
+                        }
+                        else
+                        {
+                            leds[index] = colors[m_color];
+                            leds[index + 1] = colors[m_color + 1];
+                            leds[index + 2] = colors[m_color + 2];
+                        }
                     }
-
-                    led_progress = 0;
                 }
                 else
                 {
-                    if(effect == FILL)
-                    {
-                        leds[index] = 0x00;
-                        leds[index + 1] = 0x00;
-                        leds[index + 2] = 0x00;
-                    }
+                    uint16_t d_progress = (progress + i * led_progress) * args[3] % UINT16_MAX;
+                    if(args[2])
+                        rainbow_at_progress_full(leds + alt_index, d_progress, args[1]);
                     else
-                    {
-                        leds[index] = colors[m_color];
-                        leds[index + 1] = colors[m_color + 1];
-                        leds[index + 2] = colors[m_color + 2];
-                    }
+                        rainbow_at_progress(leds + alt_index, d_progress, args[1]);
                 }
             }
         }

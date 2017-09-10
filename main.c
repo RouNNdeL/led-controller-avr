@@ -11,6 +11,14 @@ volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run 
 
 void update()
 {
+    /* Convert from RGB to GRB expected by WS2812B */
+    for(uint8_t i = 0; i < LED_COUNT; ++i)
+    {
+        uint8_t index = i*3;
+        uint8_t temp = strip_buf[index+1];
+        strip_buf[index+1] = strip_buf[index];
+        strip_buf[index] = temp;
+    }
     output_grb_strip(strip_buf, sizeof(strip_buf));
 }
 
@@ -29,8 +37,8 @@ int main(void)
     init();
 
     uint8_t color[3];
-    uint16_t times[] = {0, 64, 0, 0};
-    uint8_t args[] = {1, 255, 0, 1};
+    uint16_t times[] = {0, 0, 0, 64};
+    uint8_t args[] = {0, 255, 0, 1};
     uint8_t colors[48];
 
     uint8_t brightness = 255;
