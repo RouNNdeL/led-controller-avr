@@ -112,7 +112,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
 #pragma clang diagnostic pop
 
 void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uint32_t frame,
-                uint16_t *times, uint8_t *colors, uint8_t color_count)
+                uint16_t *times, uint8_t *args, uint8_t *colors, uint8_t color_count)
 {
     uint32_t sum = times[0] + times[1] + times[2] + times[3];
     uint32_t d_time = frame % sum;
@@ -137,7 +137,7 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
 
             for(uint8_t i = 0; i < count; ++i)
             {
-                uint8_t index = i * 3;
+                uint8_t index = args[0] ? i*3 : (count - i - 1) * 3;
 
                 if(led_progress >= UINT8_MAX)
                 {
@@ -178,7 +178,7 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
 
             for(uint8_t i = 0; i < count; ++i)
             {
-                uint8_t index = (count - i - 1) * 3;
+                uint8_t index = args[0] ? (count - i - 1) * 3 : i*3;
 
                 if(led_progress >= UINT8_MAX)
                 {
