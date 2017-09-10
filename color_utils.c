@@ -35,6 +35,35 @@ void cross_fade(uint8_t *color, uint8_t *colors, uint8_t n_color, uint8_t m_colo
         color[2] = colors[n_color] + (colors[m_color] - colors[n_color]) * (uint32_t) progress / UINT16_MAX;
 }
 
+void rainbow_at_progress(uint8_t *color, uint16_t progress, uint8_t brightness)
+{
+    if(progress <= 21845)
+    {
+        uint8_t val = progress / 86;
+        color[0] = UINT8_MAX - val;
+        color[1] = 0;
+        color[2] = val;
+    }
+    else if((progress -= 21845) <= 21845)
+    {
+        uint8_t val = progress / 86;
+        color[0] = 0;
+        color[1] = val;
+        color[2] = UINT8_MAX - val;
+    }
+    else if((progress -= 21845) <= 21845)
+    {
+        uint8_t val = progress / 86;
+        color[0] = val;
+        color[1] = UINT8_MAX - val;
+        color[2] = 0;
+    }
+
+    color[0] = color[0]*brightness/UINT8_MAX;
+    color[1] = color[1]*brightness/UINT8_MAX;
+    color[2] = color[2]*brightness/UINT8_MAX;
+}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
 
@@ -131,35 +160,42 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
     {
         uint16_t progress = d_time * UINT16_MAX / times[1];
 
-        if(effect == FILL)
+        if(effect == FILL || effect == RAINBOW)
         {
-            uint16_t led_progress = (progress * (uint32_t) count) / UINT8_MAX;
+            uint16_t led_progress = effect == FILL ? (progress * (uint32_t) count) / UINT8_MAX : UINT16_MAX / count;;
 
             for(uint8_t i = 0; i < count; ++i)
             {
                 uint8_t index = args[0] ? i*3 : (count - i - 1) * 3;
 
-                if(led_progress >= UINT8_MAX)
+                if(effect == FILL)
                 {
-                    leds[index] = colors[n_color];
-                    leds[index + 1] = colors[n_color + 1];
-                    leds[index + 2] = colors[n_color + 2];
+                    if(led_progress >= UINT8_MAX)
+                    {
+                        leds[index] = colors[n_color];
+                        leds[index + 1] = colors[n_color + 1];
+                        leds[index + 2] = colors[n_color + 2];
 
-                    led_progress -= UINT8_MAX;
-                }
-                else if(led_progress > 0)
-                {
-                    leds[index] = colors[n_color] * led_progress / UINT8_MAX;
-                    leds[index + 1] = colors[n_color + 1] * led_progress / UINT8_MAX;
-                    leds[index + 2] = colors[n_color + 2] * led_progress / UINT8_MAX;
+                        led_progress -= UINT8_MAX;
+                    }
+                    else if(led_progress > 0)
+                    {
+                        leds[index] = colors[n_color] * led_progress / UINT8_MAX;
+                        leds[index + 1] = colors[n_color + 1] * led_progress / UINT8_MAX;
+                        leds[index + 2] = colors[n_color + 2] * led_progress / UINT8_MAX;
 
-                    led_progress = 0;
+                        led_progress = 0;
+                    }
+                    else
+                    {
+                        leds[index] = 0x00;
+                        leds[index + 1] = 0x00;
+                        leds[index + 2] = 0x00;
+                    }
                 }
                 else
                 {
-                    leds[index] = 0x00;
-                    leds[index + 1] = 0x00;
-                    leds[index + 2] = 0x00;
+                    rainbow_at_progress(leds+index, (progress+i*led_progress)%UINT16_MAX, args[1]);
                 }
             }
         }
