@@ -29,8 +29,8 @@ int main(void)
     init();
 
     uint8_t color[3];
-    uint16_t times[] = {0, 100, 0, 0};
-    uint8_t args[] = {0, 255, 0, 0};
+    uint16_t times[] = {0, 64, 0, 0};
+    uint8_t args[] = {1, 255, 0, 1};
     uint8_t colors[48];
 
     uint8_t brightness = 255;
@@ -60,6 +60,7 @@ int main(void)
             previous_frame = frame;
             //simple_effect(FADE, color, frame, times, colors, 3);
             adv_effect(RAINBOW, strip_buf, LED_COUNT, 0, frame, times, args, colors, 1);
+            //adv_effect(RAINBOW, strip_buf+18, LED_COUNT/2, 0, frame, times, args, colors, 1);
             //set_all_colors(strip_buf, color[0], color[1], color[2], LED_COUNT);
         }
     }

@@ -35,6 +35,50 @@ void cross_fade(uint8_t *color, uint8_t *colors, uint8_t n_color, uint8_t m_colo
         color[2] = colors[n_color] + (colors[m_color] - colors[n_color]) * (uint32_t) progress / UINT16_MAX;
 }
 
+void rainbow_at_progress_full(uint8_t *color, uint16_t progress, uint8_t brightness)
+{
+    if(progress <= 10922)
+    {
+        color[0] = 255;
+        color[1] = 0;
+        color[2] = progress / 43;
+    }
+    else if((progress -= 10923) <= 10923)
+    {
+        color[0] = UINT8_MAX - progress / 43;
+        color[1] = 0;
+        color[2] = 255;
+    }
+    else if((progress -= 10922) <= 10922)
+    {
+        color[0] = 0;
+        color[1] = progress / 43;
+        color[2] = 255;
+    }
+    else if((progress -= 10923) <= 10923)
+    {
+        color[0] = 0;
+        color[1] = 255;
+        color[2] = UINT8_MAX - progress / 43;
+    }
+    else if((progress -= 10922) <= 10922)
+    {
+        color[0] = progress / 43;
+        color[1] = 255;
+        color[2] = 0;
+    }
+    else if((progress -= 10923) <= 10923)
+    {
+        color[0] = 255;
+        color[1] = UINT8_MAX - progress / 43;
+        color[2] = 0;
+    }
+
+    color[0] = color[0]*brightness/UINT8_MAX;
+    color[1] = color[1]*brightness/UINT8_MAX;
+    color[2] = color[2]*brightness/UINT8_MAX;
+}
+
 void rainbow_at_progress(uint8_t *color, uint16_t progress, uint8_t brightness)
 {
     if(progress <= 21845)
@@ -63,6 +107,7 @@ void rainbow_at_progress(uint8_t *color, uint16_t progress, uint8_t brightness)
     color[1] = color[1]*brightness/UINT8_MAX;
     color[2] = color[2]*brightness/UINT8_MAX;
 }
+
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
@@ -195,7 +240,10 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t count, uint8_t offset, uin
                 }
                 else
                 {
-                    rainbow_at_progress(leds+index, (progress+i*led_progress)%UINT16_MAX, args[1]);
+                    if(args[2])
+                        rainbow_at_progress_full(leds+index, (progress+i*led_progress)*args[3]%UINT16_MAX, args[1]);
+                    else
+                        rainbow_at_progress(leds+index, (progress+i*led_progress)*args[3]%UINT16_MAX, args[1]);
                 }
             }
         }
