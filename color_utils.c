@@ -224,7 +224,7 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset,
 
                         led_progress -= UINT8_MAX;
                     }
-                    else if(led_progress > 0)
+                    else if(led_progress > 0 && args[3])
                     {
 
                         leds[index] = colors[n_color] * led_progress / UINT8_MAX;
@@ -261,8 +261,8 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset,
 
                 for(uint8_t i = 0; i < led_count; ++i)
                 {
-                    uint8_t index = args[0] ? (led_count - i - 1) * 3 : i * 3;
-                    uint8_t alt_index = args[0] ? i * 3 : (led_count - i - 1) * 3;
+                    uint8_t index = (args[0] ? (led_count - i - 1) : i) * 3;
+                    uint8_t alt_index = (args[0] ? i : (led_count - i - 1)) * 3;
 
                     if(effect != RAINBOW)
                     {
@@ -274,7 +274,7 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset,
 
                             led_progress -= UINT8_MAX;
                         }
-                        else if(led_progress > 0)
+                        else if(led_progress > 0 && args[3])
                         {
                             if(effect == FILL)
                             {
@@ -359,9 +359,9 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset,
         uint8_t color = 0;
         for(uint8_t j = 0; j < led_count; ++j)
         {
-            uint8_t index = ((j + led_offset) % led_count) * 3;
+            uint8_t index = (args[0] ? j + led_offset : led_count + j + 1 - led_offset) % led_count * 3;
 
-            if(current_leds == 0 && led_carry)
+            if(current_leds == 0 && led_carry && args[3])
             {
                 cross_fade(leds + index, c_colors, color * 3, ((color + args[1] - 1) % args[1]) * 3,
                            led_carry * UINT8_MAX);

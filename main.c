@@ -42,27 +42,16 @@ int main(void)
     init();
 
     uint8_t color[3];
-    uint16_t times[] = {128, 0, 128, 32};
-    uint8_t args[] = {0, 3, 3, 0};
+    uint16_t times[] = {0, 0, 0, 256};
+    uint8_t args[] = {1, 2, 4, 0};
     uint8_t colors[48];
 
-    uint8_t brightness = 50;
+    uint8_t brightness = 200;
 
-    colors[0] = brightness;
-    colors[1] = 0;
-    colors[2] = 0;
-
-    colors[3] = 0;
-    colors[4] = brightness;
-    colors[5] = 0;
-
-    colors[6] = 0;
-    colors[7] = 0;
-    colors[8] = brightness;
-
-    colors[9] = 0;
-    colors[10] = 0;
-    colors[11] = 0;
+    set_color(colors, 0, brightness, 0, 0);
+    //set_color(colors, 1, 0, 0, 0);
+    //set_color(colors, 2, 0, 0, 0);
+    set_color(colors, 1, 0, 0, brightness);
 
     uint32_t previous_frame = 1;
 
@@ -72,7 +61,7 @@ int main(void)
         {
             previous_frame = frame;
             //simple_effect(FADE, color, frame, times, colors, 3);
-            adv_effect(PIECES, strip_buf, LED_COUNT, 0, frame, times, args, colors, 3);
+            adv_effect(FADE, strip_buf, LED_COUNT, 0, frame, times, args, colors, 2);
             //adv_effect(RAINBOW, strip_buf+18, LED_COUNT/2, 0, frame, times, args, colors, 1);
             //set_all_colors(strip_buf, color[0], color[1], color[2], LED_COUNT);
         }
