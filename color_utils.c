@@ -118,7 +118,7 @@ void rainbow_at_progress(uint8_t *color, uint16_t progress, uint8_t brightness)
  * @param frame - a frame to calculate the color for
  * @param times - timing arguments resolved to frames
  * @param colors - an array of length 24 containing 16*4 colors
- *               in a proper configuration for set device (fans are always GRB)
+ *               in a RGB order
  * @param color_count - how many colors are in use
  * @return - a color to be displayed at a given frame
  */
@@ -185,6 +185,25 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
 
 #pragma clang diagnostic pop
 
+/**
+ * Function to calculate the effects for addressable LEDs
+ *
+ * Arguments for effects:<ul>
+ * <li>FILL, FADE - {direction, NONE, NONE, smooth}</li>
+ * <li>RAINBOW - {direction, brightness, mode, smooth}</li>
+ * <li>PIECES - {direction (not implemented yet), color_count, piece_count, smooth}</li></ul>
+ *
+ * @param effect - effect to calculate
+ * @param leds - a pointer to an RGB array
+ * @param led_count - number of LEDs in the 'leds' pointer
+ * @param offset - offset for the pointer
+ * @param frame - a frame to calculate the effect for
+ * @param times - timing arguments resolved to frames
+ * @param args - additional arguments for the effects, described above
+ * @param colors - an array of length 24 containing 16*4 colors
+ *               in a RGB order
+ * @param color_count - how many colors are in use
+ */
 void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset, uint32_t frame,
                 uint16_t *times, uint8_t *args, uint8_t *colors, uint8_t color_count)
 {
@@ -205,10 +224,12 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset,
         }
         else if((d_time -= times[0]) < times[1])
         {
+            /* A 16bit replace for a float*/
             uint16_t progress = d_time * UINT16_MAX / times[1];
 
             if(effect == FILL)
             {
+                /* Number from 0-255*led_count, used to make the effect smooth */
                 uint16_t led_progress = (progress * (uint32_t) led_count) / UINT8_MAX;
 
                 for(uint8_t i = 0; i < led_count; ++i)
@@ -252,70 +273,65 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset,
         {
             uint16_t progress = UINT16_MAX - d_time * UINT16_MAX / times[3];
 
-            //<editor-fold desc="Linear effects">
-            if(effect == FILL || effect == FADE || effect == RAINBOW)
+            uint16_t led_progress = effect != RAINBOW ?
+                                    (progress * (uint32_t) led_count) / UINT8_MAX :
+                                    UINT16_MAX / led_count; /* How much of progress is one LED */
+
+            for(uint8_t i = 0; i < led_count; ++i)
             {
-                uint16_t led_progress = effect != RAINBOW ?
-                                        (progress * (uint32_t) led_count) / UINT8_MAX :
-                                        UINT16_MAX / led_count;
+                uint8_t index = (args[0] ? (led_count - i - 1) : i) * 3;
+                uint8_t alt_index = (args[0] ? i : (led_count - i - 1)) * 3;
 
-                for(uint8_t i = 0; i < led_count; ++i)
+                if(effect != RAINBOW)
                 {
-                    uint8_t index = (args[0] ? (led_count - i - 1) : i) * 3;
-                    uint8_t alt_index = (args[0] ? i : (led_count - i - 1)) * 3;
-
-                    if(effect != RAINBOW)
+                    if(led_progress >= UINT8_MAX)
                     {
-                        if(led_progress >= UINT8_MAX)
-                        {
-                            leds[index] = colors[n_color];
-                            leds[index + 1] = colors[n_color + 1];
-                            leds[index + 2] = colors[n_color + 2];
+                        leds[index] = colors[n_color];
+                        leds[index + 1] = colors[n_color + 1];
+                        leds[index + 2] = colors[n_color + 2];
 
-                            led_progress -= UINT8_MAX;
-                        }
-                        else if(led_progress > 0 && args[3])
+                        led_progress -= UINT8_MAX;
+                    }
+                    else if(led_progress > 0 && args[3])
+                    {
+                        if(effect == FILL)
                         {
-                            if(effect == FILL)
-                            {
-                                leds[index] = colors[n_color] * led_progress / UINT8_MAX;
-                                leds[index + 1] = colors[n_color + 1] * led_progress / UINT8_MAX;
-                                leds[index + 2] = colors[n_color + 2] * led_progress / UINT8_MAX;
-                            }
-                            else
-                            {
-                                cross_fade(leds + index, colors, m_color, n_color, led_progress * UINT8_MAX);
-                            }
-
-                            led_progress = 0;
+                            leds[index] = colors[n_color] * led_progress / UINT8_MAX;
+                            leds[index + 1] = colors[n_color + 1] * led_progress / UINT8_MAX;
+                            leds[index + 2] = colors[n_color + 2] * led_progress / UINT8_MAX;
                         }
                         else
                         {
-                            if(effect == FILL)
-                            {
-                                leds[index] = 0x00;
-                                leds[index + 1] = 0x00;
-                                leds[index + 2] = 0x00;
-                            }
-                            else
-                            {
-                                leds[index] = colors[m_color];
-                                leds[index + 1] = colors[m_color + 1];
-                                leds[index + 2] = colors[m_color + 2];
-                            }
+                            cross_fade(leds + index, colors, m_color, n_color, led_progress * UINT8_MAX);
                         }
+
+                        led_progress = 0;
                     }
                     else
                     {
-                        uint16_t d_progress = (progress + i * led_progress) * args[3] % UINT16_MAX;
-                        if(args[2])
-                            rainbow_at_progress_full(leds + alt_index, d_progress, args[1]);
+                        if(effect == FILL)
+                        {
+                            leds[index] = 0x00;
+                            leds[index + 1] = 0x00;
+                            leds[index + 2] = 0x00;
+                        }
                         else
-                            rainbow_at_progress(leds + alt_index, d_progress, args[1]);
+                        {
+                            leds[index] = colors[m_color];
+                            leds[index + 1] = colors[m_color + 1];
+                            leds[index + 2] = colors[m_color + 2];
+                        }
                     }
                 }
+                else
+                {
+                    uint16_t d_progress = (progress + i * led_progress) * args[3] % UINT16_MAX;
+                    if(args[2])
+                        rainbow_at_progress_full(leds + alt_index, d_progress, args[1]);
+                    else
+                        rainbow_at_progress(leds + alt_index, d_progress, args[1]);
+                }
             }
-            //</editor-fold>
         }
     }
     else
@@ -328,6 +344,7 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset,
         n_color *= 3;
         m_color *= 3;
 
+        /* Generate our colors used in this frame */
         if((d_time) < times[2])
         {
             for(uint8_t i = 0; i < args[1]; ++i)
@@ -340,6 +357,7 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset,
         }
         else if((d_time -= times[2]) < times[3])
         {
+            /* Crossfade based on progress if needed */
             uint16_t progress = d_time * UINT16_MAX / times[3];
 
             for(uint8_t i = 0; i < args[1]; ++i)
@@ -349,18 +367,21 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset,
             }
         }
 
-
+        //TODO: Possibly optimize those calculations
         uint16_t rotation_progress = times[0] ? frame % times[0] * UINT16_MAX / times[0] : 0;
-        uint8_t led_offset = rotation_progress / (UINT16_MAX / led_count);
-        uint8_t led_carry =
-                (uint32_t) rotation_progress * UINT8_MAX / (UINT16_MAX / led_count) - UINT8_MAX * led_offset;
-        uint16_t piece_leds = led_count / args[2] * UINT8_MAX;
+        uint8_t led_offset = rotation_progress / (UINT16_MAX / led_count); /* Which LED is the start led */
+        uint8_t led_carry = (uint32_t) rotation_progress * UINT8_MAX / (UINT16_MAX / led_count)
+                            - UINT8_MAX * led_offset; /* What's left from the previous LED */
+        uint16_t piece_leds = led_count / args[2] * UINT8_MAX; /* How many LEDs per piece (*255) */
         uint16_t current_leds = 0;
         uint8_t color = 0;
+
         for(uint8_t j = 0; j < led_count; ++j)
         {
+            //TODO: Add direction argument support
             uint8_t index = (args[0] ? j + led_offset : led_count + j + 1 - led_offset) % led_count * 3;
 
+            /* If we're at the first LED of a certain color and led_carry != 0 crossfade with the previous color */
             if(current_leds == 0 && led_carry && args[3])
             {
                 cross_fade(leds + index, c_colors, color * 3, ((color + args[1] - 1) % args[1]) * 3,
@@ -375,9 +396,9 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset,
             }
             else
             {
-                color = (color + 1) % args[1];
-                current_leds = 0;
-                j--;
+                color = (color + 1) % args[1]; /* Next color */
+                current_leds = 0; /* Reset current counter */
+                j--; /* Backtrack to crossfade that LED */
             }
         }
     }
