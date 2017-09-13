@@ -5,7 +5,11 @@
 
 typedef enum
 {
-    BREATHE, FADE, FILL, RAINBOW, PIECES
+    BREATHE = 0x00,
+    FADE = 0x01,
+    RAINBOW = 0x02,
+    FILL = 0x03,
+    PIECES = 0x0C,
 } effect;
 
 void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t count);
