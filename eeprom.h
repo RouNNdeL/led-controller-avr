@@ -7,6 +7,12 @@
 #    error "This memory locations are only valid for an ATmega1284P"
 #endif
 
+#define CURRENT_PROFILE 0x00
+#define PROFILE_COUNT 0x01
+#define BRIGHTNESS 0x02
+#define DEVICE_COUNT 0x03
+#define STRIP_CONFIG 0x04
+
 #define PROFILES_OFFSET 0xFF
 #define PROFILE_LENGTH 0x140
 #define PROFILE(n) (n*PROFILE_LENGTH+PROFILES_OFFSET)

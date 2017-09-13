@@ -1,33 +1,70 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <stdlib.h>
+#include <avr/eeprom.h>
 #include "color_utils.h"
+#include "eeprom.h"
 
 #define LED_COUNT 12
+#define FPS 64
 
 extern void output_grb_strip(uint8_t *ptr, uint16_t count);
 
-uint8_t strip_buf[LED_COUNT * 3];
+uint8_t *fan_buf;
+uint8_t brightness;
+uint8_t profile_count;
+uint8_t n_profile;
+profile current_profile;
+
 volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
 
-void update()
+void convert_bufs()
 {
     /* Convert from RGB to GRB expected by WS2812B and convert to actual brightness*/
     for(uint8_t i = 0; i < LED_COUNT; ++i)
     {
-        uint8_t index = i*3;
+        uint8_t index = i * 3;
 
-        strip_buf[index] = actual_brightness(strip_buf[index]);
-        strip_buf[index+1] = actual_brightness(strip_buf[index+1]);
-        strip_buf[index+2] = actual_brightness(strip_buf[index+2]);
+        fan_buf[index] = actual_brightness(fan_buf[index]);
+        fan_buf[index + 1] = actual_brightness(fan_buf[index + 1]);
+        fan_buf[index + 2] = actual_brightness(fan_buf[index + 2]);
 
-        uint8_t temp = strip_buf[index+1];
-        strip_buf[index+1] = strip_buf[index];
-        strip_buf[index] = temp;
+        uint8_t temp = fan_buf[index + 1];
+        fan_buf[index + 1] = fan_buf[index];
+        fan_buf[index] = temp;
     }
-    output_grb_strip(strip_buf, sizeof(strip_buf));
 }
 
-void init()
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
+uint16_t time_to_frames(uint8_t time)
+{
+    if(time <= 100)
+    {
+        return time * FPS / 8;
+    }
+    else if(time <= 180)
+    {
+        return time * FPS / 2 - FPS * 30;
+    }
+    else if(time < 240)
+    {
+        return (time - 120) * FPS;
+    }
+    else if(time < 254)
+    {
+        return (time * 30 - 7080) * FPS;
+    }
+    return 600 * FPS;
+}
+#pragma clang diagnostic pop
+
+void update()
+{
+    output_grb_strip(fan_buf, sizeof(fan_buf));
+}
+
+void init_avr()
 {
     DDRD |= (1 << PD2);
     TCCR1B |= (1 << WGM12);  /* Set timer1 to CTC mode */
@@ -37,21 +74,19 @@ void init()
     TCCR1B |= (1 << CS12);   /* Set the timer1 prescaler to 256 */
 }
 
+void init_eeprom()
+{
+    /* Fetch simple data from eeprom */
+}
+
+void fetch_profile(uint8_t n)
+{
+    /* Fetch profile from eeprom */
+}
+
 int main(void)
 {
-    init();
-
-    uint8_t color[3];
-    uint16_t times[] = {256, 0, 128, 32};
-    uint8_t args[] = {1, 2, 4, 1};
-    uint8_t colors[48];
-
-    uint8_t brightness = 100;
-
-    set_color(colors, 0, brightness, 0, 0);
-    set_color(colors, 1, 0, brightness, 0);
-    set_color(colors, 2, 0, 0, brightness);
-    set_color(colors, 3, brightness, brightness, 0);
+    init_avr();
 
     uint32_t previous_frame = 1;
 
@@ -60,10 +95,10 @@ int main(void)
         if(previous_frame != frame)
         {
             previous_frame = frame;
-            //simple_effect(FADE, color, frame, times, colors, 3);
-            adv_effect(PIECES, strip_buf, LED_COUNT, 0, frame, times, args, colors, 4);
-            //adv_effect(RAINBOW, strip_buf+18, LED_COUNT/2, 0, frame, times, args, colors, 1);
-            //set_all_colors(strip_buf, color[0], color[1], color[2], LED_COUNT);
+
+            /* Calculate effects for all devices*/
+
+            convert_bufs();
         }
     }
 }
