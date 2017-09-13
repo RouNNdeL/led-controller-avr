@@ -14,6 +14,7 @@ uint8_t *fan_buf;
 uint8_t brightness;
 uint8_t profile_count;
 uint8_t n_profile;
+uint8_t leds_enabled;
 profile current_profile;
 
 volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
@@ -74,14 +75,27 @@ void init_avr()
     TCCR1B |= (1 << CS12);   /* Set the timer1 prescaler to 256 */
 }
 
-void init_eeprom()
-{
-    /* Fetch simple data from eeprom */
-}
-
 void fetch_profile(uint8_t n)
 {
-    /* Fetch profile from eeprom */
+    eeprom_read_block(&current_profile, (const void *) PROFILE(n), sizeof(profile));
+}
+
+void save_profile(profile p, uint8_t n)
+{
+    eeprom_update_block(&p, (void *) PROFILE(n), sizeof(profile));
+}
+
+void init_eeprom()
+{
+    n_profile = eeprom_read_byte((const uint8_t *) CURRENT_PROFILE);
+    profile_count = eeprom_read_byte((const uint8_t *) PROFILE_COUNT);
+    brightness = eeprom_read_byte((const uint8_t *) BRIGHTNESS);
+    leds_enabled = eeprom_read_byte((const uint8_t *) LEDS_ENABLED);
+
+    if(leds_enabled)
+    {
+        fetch_profile(n_profile);
+    }
 }
 
 int main(void)
