@@ -1,5 +1,6 @@
 #include <avr/io.h>
 #include <unwind.h>
+#include <string.h>
 #include "color_utils.h"
 
 void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b)
@@ -109,6 +110,46 @@ void rainbow_at_progress(uint8_t *color, uint16_t progress, uint8_t brightness)
     color[2] = color[2] * brightness / UINT8_MAX;
 }
 
+void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, uint8_t start_led, uint16_t piece_leds,
+                uint8_t bit_pack, uint8_t *colors, uint8_t color_count)
+{
+    /* Which LED is the start led */
+    uint8_t led_offset = (rotation_progress / (UINT16_MAX / led_count)) % led_count;
+    /* What's left from the previous LED */
+    uint8_t led_carry =
+            (uint32_t) rotation_progress * UINT8_MAX / (UINT16_MAX / led_count) - UINT8_MAX * led_offset;
+    /* How many LEDs per piece (*255) */
+    uint16_t current_leds = 0;
+    uint8_t color = 0;
+
+    for(uint8_t j = 0; j < led_count; ++j)
+    {
+        //TODO: Add direction argument support
+        uint8_t index = (((bit_pack & DIRECTION) ? j + led_offset :
+                          led_count + j + 1 - led_offset) + start_led) % led_count * 3;
+
+        /* If we're at the first LED of a certain color and led_carry != 0 crossfade with the previous color */
+        if(current_leds == 0 && led_carry && (bit_pack & SMOOTH))
+        {
+            cross_fade(leds + index, colors, color * 3,
+                       ((color + color_count - 1) % color_count) * 3, led_carry * UINT8_MAX);
+
+            current_leds = led_carry;
+        }
+        else if((current_leds += UINT8_MAX) <= piece_leds)
+        {
+            leds[index] = colors[color * 3];
+            leds[index + 1] = colors[color * 3 + 1];
+            leds[index + 2] = colors[color * 3 + 2];
+        }
+        else
+        {
+            color = (color + 1) % color_count; /* Next color */
+            current_leds = 0; /* Reset current counter */
+            j--; /* Backtrack to crossfade that LED */
+        }
+    }
+}
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
@@ -180,6 +221,10 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
             color[0] = colors[n_color++] * (uint32_t) progress / UINT16_MAX;
             color[1] = colors[n_color++] * (uint32_t) progress / UINT16_MAX;
             color[2] = colors[n_color] * (uint32_t) progress / UINT16_MAX;
+        }
+        else if(effect == RAINBOW)
+        {
+            rainbow_at_progress_full(color, progress, 255);
         }
     }
 }
@@ -337,6 +382,13 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t start_l
                 }
             }
         }
+        if(times[4])
+        {
+            uint16_t rotation_progress = ((uint32_t) (frame % times[4]) * UINT16_MAX) / times[4];
+            uint8_t backup[led_count * 3];
+            memcpy(backup, leds, led_count * 3);
+            rotate_buf(leds, led_count, rotation_progress, 0, UINT8_MAX, args[0], backup, led_count);
+        }
     }
     else
     {
@@ -410,43 +462,8 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t start_l
 
         //TODO: Possibly optimize those calculations
         uint16_t rotation_progress = times[0] ? frame % times[0] * UINT16_MAX / times[0] : 0;
-
-        /* Which LED is the start led */
-        uint8_t led_offset = (rotation_progress / (UINT16_MAX / led_count)) % led_count;
-        /* What's left from the previous LED */
-        uint8_t led_carry =
-                (uint32_t) rotation_progress * UINT8_MAX / (UINT16_MAX / led_count) - UINT8_MAX * led_offset;
-        /* How many LEDs per piece (*255) */
         uint16_t piece_leds = (effect == ROTATING ? 1 : led_count / args[2]) * UINT8_MAX;
-        uint16_t current_leds = 0;
-        uint8_t color = 0;
 
-        for(uint8_t j = 0; j < led_count; ++j)
-        {
-            //TODO: Add direction argument support
-            uint8_t index = (((args[0] & DIRECTION) ? j + led_offset :
-                              led_count + j + 1 - led_offset) + start_led) % led_count * 3;
-
-            /* If we're at the first LED of a certain color and led_carry != 0 crossfade with the previous color */
-            if(current_leds == 0 && led_carry && (args[0] & SMOOTH))
-            {
-                cross_fade(leds + index, c_colors, color * 3,
-                           ((color + c_count - 1) % c_count) * 3, led_carry * UINT8_MAX);
-
-                current_leds = led_carry;
-            }
-            else if((current_leds += UINT8_MAX) <= piece_leds)
-            {
-                leds[index] = c_colors[color * 3];
-                leds[index + 1] = c_colors[color * 3 + 1];
-                leds[index + 2] = c_colors[color * 3 + 2];
-            }
-            else
-            {
-                color = (color + 1) % c_count; /* Next color */
-                current_leds = 0; /* Reset current counter */
-                j--; /* Backtrack to crossfade that LED */
-            }
-        }
+        rotate_buf(leds, led_count, rotation_progress, start_led, piece_leds, args[0], c_colors, c_count);
     }
 }
