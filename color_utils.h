@@ -2,6 +2,11 @@
 #define LEDCONTROLLER_COLOR_UTILS_H
 
 #define actual_brightness(brightness) (brightness * brightness) / 255;
+#define DIRECTION_BIT 0
+#define SMOOTH_BIT 1
+
+#define DIRECTION (1 << DIRECTION_BIT)
+#define SMOOTH (1 << SMOOTH_BIT)
 
 typedef enum
 {
@@ -9,7 +14,9 @@ typedef enum
     FADE = 0x01,
     RAINBOW = 0x02,
     FILL = 0x03,
+    ROTATING = 0x05,
     PIECES = 0x0C,
+
 } effect;
 
 void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t count);
