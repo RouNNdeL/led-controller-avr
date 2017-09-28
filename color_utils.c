@@ -125,8 +125,7 @@ void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, ui
     for(uint8_t j = 0; j < led_count; ++j)
     {
         //TODO: Add direction argument support
-        uint8_t index = (((bit_pack & DIRECTION) ? j + led_offset :
-                          led_count + j + 1 - led_offset) + start_led) % led_count * 3;
+        uint8_t index = (j + led_offset + start_led) % led_count * 3;
 
         /* If we're at the first LED of a certain color and led_carry != 0 crossfade with the previous color */
         if(current_leds == 0 && led_carry && (bit_pack & SMOOTH))
@@ -147,6 +146,29 @@ void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, ui
             color = (color + 1) % color_count; /* Next color */
             current_leds = 0; /* Reset current counter */
             j--; /* Backtrack to crossfade that LED */
+        }
+    }
+
+    //Not the most effective, but gets the job done. 1st place for future performance improvements
+    if(bit_pack & DIRECTION)
+    {
+        uint8_t i = led_count - 1;
+        uint8_t j = 0;
+        while(i > j)
+        {
+            uint8_t index = i * 3;
+            uint8_t index2 = j * 3;
+            uint8_t r = leds[index];
+            uint8_t g = leds[index + 1];
+            uint8_t b = leds[index + 2];
+            leds[index] = leds[index2];
+            leds[index + 1] = leds[index2 + 1];
+            leds[index + 2] = leds[index2 + 2];
+            leds[index2] = r;
+            leds[index2 + 1] = g;
+            leds[index2 + 2] = b;
+            i--;
+            j++;
         }
     }
 }
@@ -235,8 +257,8 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
  * Arguments for effects:<ul>
  * <li>FILL, FADE - {bit_packed*, NONE, NONE, NONE}</li>
  * <li>RAINBOW - {bit_packed*, brightness, sources, NONE}</li>
- * <li>PIECES - {bit_packed* (dir implemented yet), color_count, piece_count, NONE}</li>
- * <li>ROTATING - {bit_packed* (dir implemented yet), color_count, element_count, led_count}</li></ul>
+ * <li>PIECES - {bit_packed*, color_count, piece_count, NONE}</li>
+ * <li>ROTATING - {bit_packed*, color_count, element_count, led_count}</li></ul>
  * 
  * * - We pack 1 bit values to allow for more arguments:<ul>
  * <li>DIRECTION - 0</li>
