@@ -236,7 +236,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
  *
  * Arguments for effects:<ul>
  * <li>FILL, FADE - {bit_packed*, NONE, NONE, NONE}</li>
- * <li>RAINBOW - {bit_packed*, brightness, mode, NONE}</li>
+ * <li>RAINBOW - {bit_packed*, brightness, mode, sources}</li>
  * <li>PIECES - {bit_packed* (dir implemented yet), color_count, piece_count, NONE}</li>
  * <li>ROTATING - {bit_packed* (dir implemented yet), color_count, element_count, led_count}</li></ul>
  * 
@@ -255,9 +255,15 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
  *               in a RGB order
  * @param color_count - how many colors are in use
  */
-void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t start_led, uint32_t frame,
-                uint16_t *times, uint8_t *args, uint8_t *colors, uint8_t color_count)
+void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t start_led, uint32_t frame,
+                    uint16_t *times, uint8_t *args, uint8_t *colors, uint8_t color_count)
 {
+    if(effect == BREATHE || effect == FADE)
+    {
+        uint8_t color[3];
+        simple_effect(effect, color, frame, times, colors, color_count);
+        set_all_colors(leds, color[0], color[1], color[2], led_count);
+    }
     if(effect != PIECES && effect != ROTATING)
     {
         uint32_t sum = times[0] + times[1] + times[2] + times[3];
@@ -422,7 +428,7 @@ void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t start_l
                     c_colors[index + 1] = colors[n_color + c_index + 1];
                     c_colors[index + 2] = colors[n_color + c_index + 2];
                     c_leds++;
-                    if(effect == ROTATING && c_leds >= args[3])
+                    if(effect != ROTATING || c_leds >= args[3])
                     {
                         count = (count + 1) % args[1];
                         c_leds = 0;

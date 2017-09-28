@@ -37,7 +37,7 @@ set(AVR_L_FUSE 0xff)
 # name your project
 ##########################################################################
 project(LedController C ASM)
-set(SOURCE_FILES main.c color_utils.c ws2812b_strip.S)
+set(SOURCE_FILES main.c color_utils.c uart.c ws2812b_strip.S)
 
 ##################################################################################
 # status messages
@@ -74,8 +74,8 @@ else(DEFINED ENV{AVR_FIND_ROOT_PATH})
         set(CMAKE_FIND_ROOT_PATH "/usr/avr")
     elseif(EXISTS "/usr/lib/avr")
         set(CMAKE_FIND_ROOT_PATH "/usr/lib/avr")
-    elseif(EXISTS "C:/Program Files/WinAVR/bin/")
-        set(CMAKE_FIND_ROOT_PATH "C:/Program Files/WinAVR/bin/")
+    elseif(EXISTS "C:/Program Files/AvrGcc/avr")
+        set(CMAKE_FIND_ROOT_PATH "C:/Program Files/AvrGcc/avr")
     else(EXISTS "/opt/local/avr")
         message(FATAL_ERROR "Please set AVR_FIND_ROOT_PATH in your environment.")
     endif(EXISTS "/opt/local/avr")

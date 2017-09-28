@@ -1,7 +1,7 @@
 #ifndef LEDCONTROLLER_COLOR_UTILS_H
 #define LEDCONTROLLER_COLOR_UTILS_H
 
-#define actual_brightness(brightness) (brightness * brightness) / 255;
+#define actual_brightness(brightness) (brightness * brightness) / UINT8_MAX;
 #define DIRECTION_BIT 0
 #define SMOOTH_BIT 1
 
@@ -12,8 +12,9 @@ typedef enum
 {
     BREATHE = 0x00,
     FADE = 0x01,
-    RAINBOW = 0x02,
-    FILL = 0x03,
+    FILLING_FADE = 0x02,
+    RAINBOW = 0x03,
+    FILL = 0x04,
     ROTATING = 0x05,
     PIECES = 0x0C,
 
@@ -28,7 +29,7 @@ void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, ui
 
 void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *times, uint8_t *colors, uint8_t color_count);
 
-void adv_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset, uint32_t frame,
-                uint16_t *times, uint8_t *args, uint8_t *colors, uint8_t color_count);
+void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset, uint32_t frame,
+                    uint16_t *times, uint8_t *args, uint8_t *colors, uint8_t color_count);
 
 #endif //LEDCONTROLLER_COLOR_UTILS_H
