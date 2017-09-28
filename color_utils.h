@@ -2,11 +2,33 @@
 #define LEDCONTROLLER_COLOR_UTILS_H
 
 #define actual_brightness(brightness) (brightness * brightness) / UINT8_MAX;
+
 #define DIRECTION_BIT 0
 #define SMOOTH_BIT 1
+#define RAINBOW_MODE_BIT 2
 
 #define DIRECTION (1 << DIRECTION_BIT)
 #define SMOOTH (1 << SMOOTH_BIT)
+#define RAINBOW_MODE (1 << RAINBOW_MODE_BIT)
+
+#define TIME_OFF 0
+#define TIME_FADEIN 1
+#define TIME_ON 2
+#define TIME_FADEOUT 3
+#define TIME_ROTATION 4
+
+#define ARG_BIT_PACK 0
+
+#define ARG_RAINBOW_BRIGHTNESS 1
+#define ARG_RAINBOW_SOURCES 2
+
+#define ARG_PIECES_COLOR_COUNT 1
+#define ARG_PIECES_PIECE_COUNT 2
+
+#define ARG_ROTATING_COLOR_COUNT 1
+#define ARG_ROTATING_ELEMENT_COUNT 2
+#define ARG_ROTATING_LED_COUNT 3
+
 
 typedef enum
 {
