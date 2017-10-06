@@ -91,8 +91,8 @@ void init_avr()
     TCCR1B |= (1 << WGM12);  /* Set timer1 to CTC mode */
     TIMSK1 |= (1 << OCIE1A); /* Enable timer1 clear interrupt */
     sei();                   /* Enable global interrupts */
-    OCR1A = 977;             /* Set timer1 A register to reset every 1/64s */
-    TCCR1B |= (1 << CS12);   /* Set the timer1 prescaler to 256 */
+    OCR1A = 31250;           /* Set timer1 A register to reset every 1/64s */
+    TCCR1B |= (1 << CS11);   /* Set the timer1 prescaler to 8 */
 }
 
 void init_eeprom()
