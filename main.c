@@ -15,15 +15,23 @@ extern void output_grb_strip(uint8_t *ptr, uint16_t count);
 profile EEMEM profiles[3];
 global_settings EEMEM globals_addr;
 
+volatile uint8_t uart_control = 0x00;
+uint8_t uart_free = 1; /* 0 if we are currently receiving data, 1 otherwise */
 uint8_t fan_buf[LED_COUNT * 3];
 global_settings globals;
 profile current_profile;
 
 volatile uint32_t frame = 1; /* 32 bits is enough for 2 years of continuous run at 64 fps */
 
+
+#define fetch_profile(n) eeprom_read_block(&current_profile, &profiles[n], PROFILE_LENGTH);
+#define get_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH);
+#define save_profile(p, n)eeprom_update_block(p, &profiles[n], PROFILE_LENGTH);
+#define save_globals() eeprom_update_block(&globals, &globals_addr, GLOBALS_LENGTH);
+
 void convert_bufs()
 {
-    /* Convert from RGB to GRB expected by WS2812B and convert to actual brightness*/
+    /* Convert from RGB to GRB expected by WS2812B and convert to actual brightness */
     for(uint8_t i = 0; i < LED_COUNT; ++i)
     {
         uint8_t index = i * 3;
@@ -87,24 +95,9 @@ void init_avr()
     TCCR1B |= (1 << CS12);   /* Set the timer1 prescaler to 256 */
 }
 
-void fetch_profile(uint8_t n)
-{
-    eeprom_read_block(&current_profile, &profiles[n], sizeof(profile));
-}
-
-void save_profile(void *p, uint8_t n)
-{
-    eeprom_update_block(p, &profiles[n], sizeof(profile));
-}
-
-void save_status()
-{
-    eeprom_update_block(&globals, &globals_addr, sizeof(global_settings));
-}
-
 void init_eeprom()
 {
-    eeprom_read_block(&globals, &globals_addr, sizeof(global_settings));
+    eeprom_read_block(&globals, &globals_addr, GLOBALS_LENGTH);
 
     if(globals.leds_enabled)
     {
@@ -112,31 +105,97 @@ void init_eeprom()
     }
 }
 
+void process_uart()
+{
+    if(uart_control)
+    {
+        switch(uart_control)
+        {
+            case SAVE_PROFILE:
+            {
+                uart_free = 0;
+                uint8_t n = uart_receive();            /* Get profile's index */
+                profile receive;
+                receive_bytes((uint8_t *) &receive, PROFILE_LENGTH); /* Receive the whole 320-byte profile */
+                uart_free = 1;
+                save_profile(&receive, n);             /* Save the received profile to eeprom */
+                break;
+            }
+            case SAVE_GLOBALS:
+            {
+                uart_free = 0;
+                receive_bytes((uint8_t *) &globals, GLOBALS_LENGTH);
+                uart_free = 1;
+                save_globals();
+                break;
+            }
+            case SEND_GLOBALS:
+            {
+                uart_free = 0;
+                transmit_bytes((uint8_t *) &globals, GLOBALS_LENGTH);
+                uart_free = 1;
+                break;
+            }
+            case SEND_PROFILE:
+            {
+                uart_free = 0;
+                uint8_t n = uart_receive();            /* Get profile's index */
+                profile transmit;
+                get_profile(transmit, n);
+                transmit_bytes((uint8_t *) &transmit, PROFILE_LENGTH);
+                uart_free = 1;
+                break;
+            }
+            default:
+            {
+                uart_transmit(UNRECOGNIZED_COMMAND);
+            }
+        }
+        uart_control = 0x00;
+    }
+}
+
 int main(void)
 {
     init_avr();
+    init_uart();
 
     uint32_t previous_frame = 0;
 
     init_eeprom();
 
+    uint8_t leds = 0;
+
     while(1)
     {
+        process_uart();
+
         if(previous_frame != frame)
         {
             previous_frame = frame;
 
-            device_profile device = current_profile.devices[0];
-            if(frame % 320 == 0)
+            if(frame % 16 == 0)
             {
-                globals.n_profile = (globals.n_profile+1)%3;
-                save_status();
-                fetch_profile(globals.n_profile);
+                leds = (leds + 1) % (LED_COUNT / 2);
             }
-            uint16_t timing_frames[4];
-            convert_to_frames(timing_frames, device.timing);
-            adv_effect((effect) device.mode, fan_buf, LED_COUNT, 0, frame, timing_frames, device.args, device.colors,
-                       device.color_count);
+            uint16_t times[] = {64, 64, 64, 64, 0};
+            uint8_t args[5];
+            args[ARG_BIT_PACK] = DIRECTION | SMOOTH | RAINBOW_MODE;
+            args[ARG_RAINBOW_SOURCES] = 1;
+            args[ARG_RAINBOW_BRIGHTNESS] = 255;
+            uint8_t colors[48];
+            uint8_t b = 255;
+            set_color(colors, 0, b, 0, 0);
+            set_color(colors, 1, 0, b, 0);
+            set_color(colors, 2, 0, 0, b);
+            set_color(colors, 3, b, 0, 0);
+
+            uint8_t color[3];
+            digital_effect(BREATHE, fan_buf, LED_COUNT, 0, frame, times, args, colors, 3);
+
+            //set_all_colors(fan_buf, color[0], color[1], color[2], LED_COUNT);
+            //set_all_colors(fan_buf, 0, 0, 0, LED_COUNT);
+            //digital_effect(RAINBOW, fan_buf, LED_COUNT, 2, frame, times, args , colors, 1);
 
             convert_bufs();
         }
@@ -147,4 +206,13 @@ ISR(TIMER1_COMPA_vect)
 {
     frame++;
     update();
+}
+
+ISR(USART_RX_vect)
+{
+    uint8_t val = UDR0;
+    if(uart_free)
+    {
+        uart_control = val;
+    }
 }
