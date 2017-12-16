@@ -25,9 +25,9 @@ cmake_minimum_required(VERSION 2.8)
 ##################################################################################
 set(AVR_UPLOADTOOL avrdude)
 set(AVR_PROGRAMMER arduino)
-set(AVR_UPLOADTOOL_PORT COM4)
+set(AVR_UPLOADTOOL_PORT COM5)
 # AVR and fuses needs to be set
-set(AVR_MCU atmega328p)
+set(AVR_MCU atmega1284)
 set(AVR_H_FUSE 0xde)
 set(AVR_L_FUSE 0xff)
 
