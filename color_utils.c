@@ -215,18 +215,9 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
     }
     else if((d_time -= times[TIME_FADEIN]) < times[TIME_ON])
     {
-        if(effect == BREATHE)
-        {
-            color[0] = colors[n_color++];
-            color[1] = colors[n_color++];
-            color[2] = colors[n_color];
-        }
-        else if(effect == FADE)
-        {
-            color[0] = colors[m_color++];
-            color[1] = colors[m_color++];
-            color[2] = colors[m_color];
-        }
+        color[0] = colors[n_color++];
+        color[1] = colors[n_color++];
+        color[2] = colors[n_color];
     }
     else if((d_time -= times[TIME_ON]) < times[TIME_FADEOUT])
     {
