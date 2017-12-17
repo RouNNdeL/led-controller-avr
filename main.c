@@ -6,10 +6,12 @@
 #include "eeprom.h"
 #include "uart.h"
 
-#define LED_COUNT 12
+#define FAN_LED_COUNT 12
+#define STRIP_LED_COUNT 1
 #define FPS 64
 
 extern void output_grb_strip(uint8_t *ptr, uint16_t count);
+extern void output_grb_fan(uint8_t * ptr, uint16_t count);
 
 //TODO: Replace 3 with 12, as the ATmega1284P can fit more profiles then the ATmega328P
 profile EEMEM profiles[3];
@@ -17,7 +19,8 @@ global_settings EEMEM globals_addr;
 
 volatile uint8_t uart_control = 0x00;
 uint8_t uart_free = 1; /* 0 if we are currently receiving data, 1 otherwise */
-uint8_t fan_buf[LED_COUNT * 3];
+uint8_t fan_buf[FAN_LED_COUNT * 3];
+uint8_t strip_buf[STRIP_LED_COUNT * 3];
 global_settings globals;
 profile current_profile;
 
@@ -32,9 +35,9 @@ volatile uint32_t frame = 1; /* 32 bits is enough for 2 years of continuous run 
 void convert_bufs()
 {
     /* Convert from RGB to GRB expected by WS2812B and convert to actual brightness */
-    for(uint8_t i = 0; i < LED_COUNT; ++i)
+    for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
     {
-        uint8_t index = i * 3;
+        uint16_t index = i * 3;
 
         fan_buf[index] = actual_brightness(fan_buf[index]);
         fan_buf[index + 1] = actual_brightness(fan_buf[index + 1]);
@@ -44,10 +47,37 @@ void convert_bufs()
         fan_buf[index + 1] = fan_buf[index];
         fan_buf[index] = temp;
     }
+
+    for(int i = 0; i < STRIP_LED_COUNT; ++i)
+    {
+        uint16_t index = i * 3;
+
+        strip_buf[index] = actual_brightness(strip_buf[index]);
+        strip_buf[index + 1] = actual_brightness(strip_buf[index + 1]);
+        strip_buf[index + 2] = actual_brightness(strip_buf[index + 2]);
+
+        uint8_t temp = strip_buf[index + 1];
+        strip_buf[index + 1] = strip_buf[index];
+        strip_buf[index] = temp;
+    }
 }
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
+
+void output_analog1(uint8_t q1, uint8_t q2, uint8_t q3)
+{
+    OCR0B = q1;
+    OCR1B = q2;
+    OCR1A = q3;
+}
+
+void output_analog2(uint8_t q4, uint8_t q5, uint8_t q6)
+{
+    OCR2B = q4;
+    OCR2A = q5;
+    OCR0A = q6;
+}
 
 uint16_t time_to_frames(uint8_t time)
 {
@@ -78,21 +108,51 @@ void convert_to_frames(uint16_t *frames, uint8_t *times)
     frames[1] = time_to_frames(times[1]);
     frames[2] = time_to_frames(times[2]);
     frames[3] = time_to_frames(times[3]);
+    frames[4] = time_to_frames(times[4]);
 }
 
 void update()
 {
-    output_grb_strip(fan_buf, sizeof(fan_buf));
+    output_grb_fan(fan_buf, sizeof(fan_buf));
+    output_grb_strip(strip_buf, sizeof(strip_buf));
+
+    /*if(frame % 64)
+    {
+        PINA &= ~(1 << PA3);
+    }
+    else
+    {
+        PINA |= (1 << PA3);
+    }*/
 }
 
 void init_avr()
 {
-    DDRD |= (1 << PD2);
-    TCCR1B |= (1 << WGM12);  /* Set timer1 to CTC mode */
-    TIMSK1 |= (1 << OCIE1A); /* Enable timer1 clear interrupt */
+    /* Initialize Data Direction Registers */
+    DDRA = 0x88; /* Pins PA3 and PA7 as output, the rest as input */
+    DDRB = 0x18; /* Pins PB3 and PB4 as output, the rest as input */
+    DDRC = 0x40; /* Pin PC6 as output, the rest as input */
+    DDRD = 0xF4; /* Pis PD2 and PD4-PD7 as output, the rest as input */
+
+    /* Initialize timer3 for time measurement */
+    TCCR3B |= (1 << WGM32);  /* Set timer3 to CTC mode */
+    TIMSK3 |= (1 << OCIE3A); /* Enable timer3 clear interrupt */
+    OCR3A = 31250;           /* Set timer3 A register to reset every 1/64s */
+    TCCR3B |= (1 << CS31);   /* Set the timer3 prescaler to 8 */
+
+    /* Initialize timer0 for PWM */
+    TCCR0A = (1 << COM0A1) | (1 << COM0B1) | (1 << WGM00);
+    TCCR0B = (1 << CS02);
+
+    /* Initialize timer1 for PWM */
+    TCCR1A = (1 << COM1A1) | (1 << COM1B1) | (1 << WGM10);
+    TCCR1B = (1 << CS12);
+
+    /* Initialize timer2 for PWM */
+    TCCR2A = (1 << COM2A1) | (1 << COM2B1) | (1 << WGM20);
+    TCCR2B = (1 << CS22);
+
     sei();                   /* Enable global interrupts */
-    OCR1A = 31250;           /* Set timer1 A register to reset every 1/64s */
-    TCCR1B |= (1 << CS11);   /* Set the timer1 prescaler to 8 */
 }
 
 void init_eeprom()
@@ -164,8 +224,6 @@ int main(void)
 
     init_eeprom();
 
-    uint8_t leds = 0;
-
     while(1)
     {
         process_uart();
@@ -174,35 +232,37 @@ int main(void)
         {
             previous_frame = frame;
 
-            if(frame % 16 == 0)
-            {
-                leds = (leds + 1) % (LED_COUNT / 2);
-            }
-            uint16_t times[] = {64, 64, 64, 64, 0};
+            uint16_t times[] = {0, 0, 0, 64*5, 0};
             uint8_t args[5];
-            args[ARG_BIT_PACK] = DIRECTION | SMOOTH | RAINBOW_MODE;
+            args[ARG_BIT_PACK] = SMOOTH;
+            args[ARG_RAINBOW_BRIGHTNESS] = 200;
             args[ARG_RAINBOW_SOURCES] = 1;
-            args[ARG_RAINBOW_BRIGHTNESS] = 255;
             uint8_t colors[48];
-            uint8_t b = 255;
+            uint8_t b = 100;
             set_color(colors, 0, b, 0, 0);
             set_color(colors, 1, 0, b, 0);
             set_color(colors, 2, 0, 0, b);
             set_color(colors, 3, b, 0, 0);
 
-            uint8_t color[3];
-            digital_effect(BREATHE, fan_buf, LED_COUNT, 0, frame, times, args, colors, 3);
+            digital_effect(FADE, strip_buf, STRIP_LED_COUNT, 0, frame, times, args, colors, 3);
+            digital_effect(FADE, fan_buf, FAN_LED_COUNT, 0, frame, times, args, colors, 3);
 
-            //set_all_colors(fan_buf, color[0], color[1], color[2], LED_COUNT);
-            //set_all_colors(fan_buf, 0, 0, 0, LED_COUNT);
-            //digital_effect(RAINBOW, fan_buf, LED_COUNT, 2, frame, times, args , colors, 1);
+            uint8_t color[3];
+            simple_effect(FADE, color, frame, times, colors, 3);
+
+            output_analog1(color[0], color[1], color[2]);
+            output_analog2(color[2], color[1], color[0]);
+
+            //set_all_colors(fan_buf, color[0], color[1], color[2], FAN_LED_COUNT);
+            //set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
+            //digital_effect(RAINBOW, fan_buf, FAN_LED_COUNT, 2, frame, times, args , colors, 1);
 
             convert_bufs();
         }
     }
 }
 
-ISR(TIMER1_COMPA_vect)
+ISR(TIMER3_COMPA_vect)
 {
     frame++;
     update();
