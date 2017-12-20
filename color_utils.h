@@ -62,9 +62,10 @@ void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b);
 void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, uint8_t start_led, uint16_t piece_leds,
                 uint8_t bit_pack, uint8_t *colors, uint8_t color_count);
 
-void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *times, uint8_t *colors, uint8_t color_count);
+void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *times, uint8_t *colors, uint8_t color_count,
+                   uint8_t color_cycles);
 
 void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset, uint32_t frame,
-                    uint16_t *times, uint8_t *args, uint8_t *colors, uint8_t color_count);
+                    uint16_t *times, uint8_t *args, uint8_t *colors, uint8_t color_count, uint8_t color_cycles);
 
 #endif //LEDCONTROLLER_COLOR_UTILS_H
