@@ -186,7 +186,7 @@ void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, ui
  * @param color_count - how many colors are in use
  * @return - a color to be displayed at a given frame
  */
-void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *times, uint8_t *colors, uint8_t color_count,
+void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *times, uint8_t *args, uint8_t *colors, uint8_t color_count,
                    uint8_t color_cycles)
 {
     uint32_t sum = times[0] + times[1] + times[2] + times[3];
@@ -198,16 +198,15 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
 
     if((d_time) < times[TIME_OFF])
     {
-        if(effect == BREATHE)
-        {
-            color[0] = 0x00;
-            color[1] = 0x00;
-            color[2] = 0x00;
-        }
+        color[0] = colors[n_color++]* args[ARG_BREATHE_START] / UINT8_MAX;
+        color[1] = colors[n_color++]* args[ARG_BREATHE_START] / UINT8_MAX;
+        color[2] = colors[n_color]* args[ARG_BREATHE_START] / UINT8_MAX;
     }
     else if((d_time -= times[TIME_OFF]) < times[TIME_FADEIN])
     {
-        uint16_t progress = d_time * UINT16_MAX / times[TIME_FADEIN];
+        uint16_t delta_brightness = args[ARG_BREATHE_END] - args[ARG_BREATHE_START];
+        uint16_t progress = d_time * delta_brightness * UINT8_MAX / times[TIME_FADEIN]
+                            + (args[ARG_BREATHE_START] * UINT8_MAX);
 
         color[0] = colors[n_color++] * (uint32_t) progress / UINT16_MAX;
         color[1] = colors[n_color++] * (uint32_t) progress / UINT16_MAX;
@@ -216,13 +215,24 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
     }
     else if((d_time -= times[TIME_FADEIN]) < times[TIME_ON])
     {
-        color[0] = colors[n_color++];
-        color[1] = colors[n_color++];
-        color[2] = colors[n_color];
+        if(effect == BREATHE)
+        {
+            color[0] = colors[n_color++]* args[ARG_BREATHE_END] / UINT8_MAX;
+            color[1] = colors[n_color++]* args[ARG_BREATHE_END] / UINT8_MAX;
+            color[2] = colors[n_color]* args[ARG_BREATHE_END] / UINT8_MAX;
+        }
+        else
+        {
+            color[0] = colors[n_color++];
+            color[1] = colors[n_color++];
+            color[2] = colors[n_color];
+        }
     }
     else if((d_time -= times[TIME_ON]) < times[TIME_FADEOUT])
     {
-        uint16_t progress = UINT16_MAX - d_time * UINT16_MAX / times[TIME_FADEOUT];
+        uint16_t delta_brightness = args[ARG_BREATHE_END] - args[ARG_BREATHE_START];
+        uint16_t progress = (args[ARG_BREATHE_END] * UINT8_MAX) -
+                            (d_time * delta_brightness * UINT8_MAX / times[TIME_FADEIN]);
 
         if(effect == BREATHE)
         {
@@ -277,7 +287,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
     if(effect == BREATHE || effect == FADE || (effect == RAINBOW && (args[ARG_BIT_PACK] & RAINBOW_SIMPLE)))
     {
         uint8_t color[3];
-        simple_effect(effect, color, frame, times, colors, color_count, color_cycles);
+        simple_effect(effect, color, frame, times, args, colors, color_count, color_cycles);
         set_all_colors(leds, color[0], color[1], color[2], led_count);
         return;
     }
