@@ -8,10 +8,22 @@
 
 #define FAN_LED_COUNT 12
 #define STRIP_LED_COUNT 1
+
 #define FPS 64
 
+#define BUTTON_MIN_FRAMES 2
+#define BUTTON_OFF_FRAMES 96
+#define BUTTON_RESET_FRAMES 320
+
+#define FLAG_BUTTON (1 << 0)
+#define FLAG_RESET (1 << 1)
+
+#define PIN_RESET (1 << PD2)
+#define PIN_BUTTON (1 << PA4)
+#define PIN_LED (1 << PA3)
+
 extern void output_grb_strip(uint8_t *ptr, uint16_t count);
-extern void output_grb_fan(uint8_t * ptr, uint16_t count);
+extern void output_grb_fan(uint8_t *ptr, uint16_t count);
 
 //TODO: Replace 3 with 12, as the ATmega1284P can fit more profiles then the ATmega328P
 profile EEMEM profiles[3];
@@ -25,7 +37,7 @@ global_settings globals;
 profile current_profile;
 
 volatile uint32_t frame = 1; /* 32 bits is enough for 2 years of continuous run at 64 fps */
-
+volatile uint8_t new_frame = 1;
 
 #define fetch_profile(n) eeprom_read_block(&current_profile, &profiles[n], PROFILE_LENGTH);
 #define get_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH);
@@ -223,30 +235,99 @@ int main(void)
     init_avr();
     init_uart();
 
-    uint32_t previous_frame = 0;
+    uint32_t button_frame = 0;
+    uint32_t reset_frame = 0;
+    uint8_t flags = 0;
+    
+    uint8_t test_profile = 0;
+    uint8_t leds_on = 1;
 
     init_eeprom();
 
     while(1)
     {
+        if((PINA & PIN_BUTTON) && !(flags & FLAG_BUTTON))
+        {
+            button_frame = frame;
+            flags |= FLAG_BUTTON;
+        }
+        else if(button_frame && !(PINA & PIN_BUTTON))
+        {
+            uint32_t time = frame - button_frame;
+
+            if(time > BUTTON_MIN_FRAMES)
+            {
+                if(time < BUTTON_OFF_FRAMES && leds_on)
+                {
+                    //TODO: Change to the next profile, send serial event 'profile_n';
+                    test_profile = !test_profile;
+                }
+                else if(time < BUTTON_RESET_FRAMES)
+                {
+                    //TODO: Turn off/on the LEDs, send serial event 'leds_state'
+                    if(!leds_on)
+                    {
+                        frame = 0;
+                    }
+                    leds_on = !leds_on;
+                }
+                else
+                {
+                    PORTD |= PIN_RESET;
+                    flags |= FLAG_RESET;
+                    reset_frame = frame+32;
+                }
+
+                button_frame = 0;
+                flags &= ~FLAG_BUTTON;
+            }
+        }
+
         process_uart();
 
-        if(previous_frame != frame)
+        if(new_frame)
         {
-            previous_frame = frame;
+            new_frame = 0;
+            if(leds_on)
+            {
+                if(test_profile)
+                {
+                    uint16_t times[] = {0, 0, 0, 64 * 2, 0};
+                    uint8_t args[5];
+                    args[ARG_BIT_PACK] = SMOOTH;
+                    args[ARG_RAINBOW_BRIGHTNESS] = 200;
+                    args[ARG_RAINBOW_SOURCES] = 1;
+                    uint8_t colors[48];
 
-            uint16_t times[] = {0, 0, 0, 64*5, 0};
-            uint8_t args[5];
-            args[ARG_BIT_PACK] = SMOOTH;
-            args[ARG_RAINBOW_BRIGHTNESS] = 200;
-            args[ARG_RAINBOW_SOURCES] = 1;
-            uint8_t colors[48];
+                    digital_effect(RAINBOW, fan_buf, FAN_LED_COUNT, 2, frame, times, args, colors, 1);
+                }
+                else
+                {
+                    uint16_t times[] = {0, 0, 0, 64 * 2, 0};
+                    uint8_t args[5];
+                    args[ARG_BIT_PACK] = SMOOTH;
+                    args[ARG_FILL_PIECE_COUNT] = 1;
+                    args[ARG_FILL_COLOR_COUNT] = 1;
+                    uint8_t colors[48];
+                    set_color(colors, 0, 255, 0, 0);
+                    set_color(colors, 1, 0, 255, 0);
+                    set_color(colors, 2, 0, 0, 255);
 
-            //set_all_colors(fan_buf, color[0], color[1], color[2], FAN_LED_COUNT);
-            //set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
-            //digital_effect(RAINBOW, fan_buf, FAN_LED_COUNT, 2, frame, times, args , colors, 1);
+                    digital_effect(FILLING_FADE, fan_buf, FAN_LED_COUNT, 2, frame, times, args, colors, 3);
+                }
+            }
+            else
+            {
+                set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
+            }
 
             convert_bufs();
+
+            if((flags & FLAG_RESET) && frame > reset_frame)
+            {
+                PORTD &= ~PIN_RESET;
+                flags &= ~FLAG_RESET;
+            }
         }
     }
 }
@@ -254,6 +335,7 @@ int main(void)
 ISR(TIMER3_COMPA_vect)
 {
     frame++;
+    new_frame = 1;
     update();
 }
 
