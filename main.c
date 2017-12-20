@@ -153,6 +153,9 @@ void init_avr()
     TCCR2B = (1 << CS22);
 
     sei();                   /* Enable global interrupts */
+
+    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT);
+    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
 }
 
 void init_eeprom()
@@ -238,20 +241,6 @@ int main(void)
             args[ARG_RAINBOW_BRIGHTNESS] = 200;
             args[ARG_RAINBOW_SOURCES] = 1;
             uint8_t colors[48];
-            uint8_t b = 100;
-            set_color(colors, 0, b, 0, 0);
-            set_color(colors, 1, 0, b, 0);
-            set_color(colors, 2, 0, 0, b);
-            set_color(colors, 3, b, 0, 0);
-
-            digital_effect(FADE, strip_buf, STRIP_LED_COUNT, 0, frame, times, args, colors, 3);
-            digital_effect(FADE, fan_buf, FAN_LED_COUNT, 0, frame, times, args, colors, 3);
-
-            uint8_t color[3];
-            simple_effect(FADE, color, frame, times, colors, 3);
-
-            output_analog1(color[0], color[1], color[2]);
-            output_analog2(color[2], color[1], color[0]);
 
             //set_all_colors(fan_buf, color[0], color[1], color[2], FAN_LED_COUNT);
             //set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);

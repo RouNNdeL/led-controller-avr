@@ -242,6 +242,9 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
 
 #pragma clang diagnostic pop
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wuninitialized"
+
 /**
  * Function to calculate the effects for addressable LEDs
  *
@@ -281,8 +284,8 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
     {
         uint32_t sum = times[0] + times[1] + times[2] + times[3];
         uint32_t d_time = frame % sum;
-        uint8_t n_color = ((frame / sum) % color_count);
-        uint8_t m_color = (n_color == color_count - 1) ? 0 : n_color + 1;
+        uint8_t n_color = ((frame / sum) % (color_count / args[ARG_FILL_COLOR_COUNT])) * args[ARG_FILL_COLOR_COUNT];
+        uint8_t m_color = (n_color + args[ARG_FILL_COLOR_COUNT]) % color_count;
         n_color *= 3;
         m_color *= 3;
 
@@ -297,32 +300,52 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
 
             if(effect == FILL)
             {
+
+                uint8_t piece_leds = led_count / args[ARG_PIECES_PIECE_COUNT];
+
                 /* Number from 0-255*led_count, used to make the effect smooth */
-                uint16_t led_progress = (progress * (uint32_t) led_count) / UINT8_MAX;
+                uint16_t led_progress_base = (progress * (uint32_t) piece_leds) / UINT8_MAX;
+                uint16_t led_progress_current;
+                int8_t piece = -1;
+                uint8_t arg_number = 0;
 
                 for(uint8_t i = 0; i < led_count; ++i)
                 {
-                    uint8_t index =
-                            (((args[ARG_BIT_PACK] & DIRECTION) ? i : led_count - i - 1) + start_led) % led_count * 3;
-
-                    if(led_progress >= UINT8_MAX)
+                    if(i % piece_leds == 0)
                     {
-                        leds[index] = colors[n_color];
-                        leds[index + 1] = colors[n_color + 1];
-                        leds[index + 2] = colors[n_color + 2];
-
-
-                        led_progress -= UINT8_MAX;
+                        led_progress_current = led_progress_base;
+                        piece++;
+                        if(piece > 8)
+                        {
+                            piece = 0;
+                            arg_number = 1;
+                        }
                     }
-                    else if(led_progress > 0 && (args[ARG_BIT_PACK] & SMOOTH))
+
+                    uint8_t direction = (arg_number ? args[ARG_FILL_PIECE_DIRECTIONS2] :
+                                         args[ARG_FILL_PIECE_DIRECTIONS1]) & (1 << piece);
+                    uint8_t index = (((direction ? i : led_count - i - 1))
+                                     % piece_leds + piece * piece_leds + start_led) % led_count * 3;
+
+                    uint8_t n_color_for_piece = n_color + 3 * piece;
+                    if(led_progress_current >= UINT8_MAX)
+                    {
+                        leds[index] = colors[n_color_for_piece];
+                        leds[index + 1] = colors[n_color_for_piece + 1];
+                        leds[index + 2] = colors[n_color_for_piece + 2];
+
+
+                        led_progress_current -= UINT8_MAX;
+                    }
+                    else if(led_progress_current > 0 && (args[ARG_BIT_PACK] & SMOOTH))
                     {
 
-                        leds[index] = colors[n_color] * led_progress / UINT8_MAX;
-                        leds[index + 1] = colors[n_color + 1] * led_progress / UINT8_MAX;
-                        leds[index + 2] = colors[n_color + 2] * led_progress / UINT8_MAX;
+                        leds[index] = colors[n_color_for_piece] * led_progress_current / UINT8_MAX;
+                        leds[index + 1] = colors[n_color_for_piece + 1] * led_progress_current / UINT8_MAX;
+                        leds[index + 2] = colors[n_color_for_piece + 2] * led_progress_current / UINT8_MAX;
 
 
-                        led_progress = 0;
+                        led_progress_current = 0;
                     }
                     else
                     {
@@ -330,79 +353,132 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                         leds[index + 1] = 0x00;
                         leds[index + 2] = 0x00;
                     }
-
                 }
             }
         }
         else if((d_time -= times[TIME_FADEIN]) < times[TIME_ON])
         {
-            set_all_colors(leds, colors[n_color], colors[n_color + 1], colors[n_color + 2], led_count);
+            uint8_t piece_leds = led_count / args[ARG_PIECES_PIECE_COUNT];
+            int8_t piece = -1;
+            uint8_t arg_number = 0;
+
+            for(uint8_t i = 0; i < led_count; ++i)
+            {
+                if(i % piece_leds == 0)
+                {
+                    piece++;
+                    if(piece > 8)
+                    {
+                        piece = 0;
+                        arg_number = 1;
+                    }
+                }
+
+
+                uint8_t index = (i + start_led) % led_count * 3;
+
+                uint8_t n_color_for_piece = n_color + 3 * piece;
+                leds[index] = colors[n_color_for_piece];
+                leds[index + 1] = colors[n_color_for_piece + 1];
+                leds[index + 2] = colors[n_color_for_piece + 2];
+            }
         }
         else if((d_time -= times[TIME_ON]) < times[TIME_FADEOUT])
         {
             uint16_t progress = UINT16_MAX - d_time * UINT16_MAX / times[TIME_FADEOUT];
 
-            uint16_t led_progress = effect != RAINBOW ?
-                                    (progress * (uint32_t) led_count) / UINT8_MAX :
-                                    UINT16_MAX / led_count; /* How much of progress is one LED */
+            uint8_t piece_leds = led_count / args[ARG_PIECES_PIECE_COUNT];
+            uint16_t led_progress_base = effect != RAINBOW ?
+                                         (progress * (uint32_t) piece_leds) / UINT8_MAX :
+                                         UINT16_MAX / led_count; /* How much of progress is one LED */
 
-            for(uint8_t i = 0; i < led_count; ++i)
+            if(effect != RAINBOW)
             {
-                uint8_t index =
-                        (((args[ARG_BIT_PACK] & DIRECTION) ? led_count - i - 1 : i) + start_led) % led_count * 3;
-                uint8_t alt_index =
-                        (((args[ARG_BIT_PACK] & DIRECTION) ? i : led_count - i - 1) + start_led) % led_count * 3;
+                uint16_t led_progress_current = led_progress_base;
+                int8_t piece = -1;
+                uint8_t arg_number = 0;
 
-                if(effect != RAINBOW)
+                for(uint8_t i = 0; i < led_count; ++i)
                 {
-                    if(led_progress >= UINT8_MAX)
+                    if(i % piece_leds == 0)
                     {
-                        leds[index] = colors[n_color];
-                        leds[index + 1] = colors[n_color + 1];
-                        leds[index + 2] = colors[n_color + 2];
-
-                        led_progress -= UINT8_MAX;
+                        led_progress_current = led_progress_base;
+                        piece++;
+                        if(piece > 8)
+                        {
+                            piece = 0;
+                            arg_number = 1;
+                        }
                     }
-                    else if(led_progress > 0 && (args[ARG_BIT_PACK] & SMOOTH))
-                    {
-                        if(effect == FILL)
-                        {
-                            leds[index] = colors[n_color] * led_progress / UINT8_MAX;
-                            leds[index + 1] = colors[n_color + 1] * led_progress / UINT8_MAX;
-                            leds[index + 2] = colors[n_color + 2] * led_progress / UINT8_MAX;
-                        }
-                        else
-                        {
-                            cross_fade(leds + index, colors, m_color, n_color, led_progress * UINT8_MAX);
-                        }
 
-                        led_progress = 0;
+                    uint8_t direction = (arg_number ? args[ARG_FILL_PIECE_DIRECTIONS2] :
+                                         args[ARG_FILL_PIECE_DIRECTIONS1]) & (1 << piece);
+                    uint8_t index =
+                            (((direction ^ (args[ARG_BIT_PACK] & FILL_FADE_RETURN ? 1 : 0) ? led_count - i - 1 : i))
+                             % piece_leds + piece * piece_leds + start_led) % led_count * 3;
+
+                    uint8_t n_color_for_piece = n_color + 3 * piece;
+                    uint8_t m_color_for_piece = m_color + 3 * piece;
+
+
+                    if(led_progress_current >= UINT8_MAX)
+                    {
+                        leds[index] = colors[n_color_for_piece];
+                        leds[index + 1] = colors[n_color_for_piece + 1];
+                        leds[index + 2] = colors[n_color_for_piece + 2];
+
+                        led_progress_current -= UINT8_MAX;
                     }
                     else
                     {
-                        if(effect == FILL)
+                        if(led_progress_current > 0 && (args[ARG_BIT_PACK] & SMOOTH))
                         {
-                            leds[index] = 0x00;
-                            leds[index + 1] = 0x00;
-                            leds[index + 2] = 0x00;
+                            if(effect == FILL)
+                            {
+                                leds[index] = colors[n_color_for_piece] * led_progress_current / UINT8_MAX;
+                                leds[index + 1] = colors[n_color_for_piece + 1] * led_progress_current / UINT8_MAX;
+                                leds[index + 2] = colors[n_color_for_piece + 2] * led_progress_current / UINT8_MAX;
+                            }
+                            else
+                            {
+                                cross_fade(leds + index, colors, m_color_for_piece, n_color_for_piece,
+                                           led_progress_current * UINT8_MAX);
+                            }
+
+                            led_progress_current = 0;
                         }
                         else
                         {
-                            leds[index] = colors[m_color];
-                            leds[index + 1] = colors[m_color + 1];
-                            leds[index + 2] = colors[m_color + 2];
+                            if(effect == FILL)
+                            {
+                                leds[index] = 0x00;
+                                leds[index + 1] = 0x00;
+                                leds[index + 2] = 0x00;
+                            }
+                            else
+                            {
+                                leds[index] = colors[m_color_for_piece];
+                                leds[index + 1] = colors[m_color_for_piece + 1];
+                                leds[index + 2] = colors[m_color_for_piece + 2];
+                            }
                         }
                     }
                 }
-                else
+            }
+            else
+            {
+                for(uint8_t i = 0; i < led_count; ++i)
                 {
-                    uint16_t d_progress = (progress + i * led_progress) * args[ARG_RAINBOW_SOURCES] % UINT16_MAX;
+                    uint8_t alt_index =
+                            (((args[ARG_BIT_PACK] & DIRECTION) ? i : led_count - i - 1) + start_led) % led_count * 3;
+                    uint16_t d_progress = (progress + i * led_progress_base) * args[ARG_RAINBOW_SOURCES] % UINT16_MAX;
                     if(args[ARG_BIT_PACK] & RAINBOW_MODE)
                         rainbow_at_progress_full(leds + alt_index, d_progress, args[ARG_RAINBOW_BRIGHTNESS]);
                     else
                         rainbow_at_progress(leds + alt_index, d_progress, args[ARG_RAINBOW_BRIGHTNESS]);
                 }
             }
+
         }
         if(times[TIME_ROTATION])
         {
@@ -493,3 +569,5 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         rotate_buf(leds, led_count, rotation_progress, start_led, piece_leds, args[ARG_BIT_PACK], c_colors, c_count);
     }
 }
+
+#pragma clang diagnostic pop

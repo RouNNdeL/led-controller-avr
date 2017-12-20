@@ -1,3 +1,4 @@
 cmake-avr/
 .idea/
 cmake-build-debug/
+effects.txt
