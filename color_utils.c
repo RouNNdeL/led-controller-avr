@@ -230,23 +230,29 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
     }
     else if((d_time -= times[TIME_ON]) < times[TIME_FADEOUT])
     {
-        uint16_t delta_brightness = args[ARG_BREATHE_END] - args[ARG_BREATHE_START];
-        uint16_t progress = (args[ARG_BREATHE_END] * UINT8_MAX) -
-                            (d_time * delta_brightness * UINT8_MAX / times[TIME_FADEIN]);
+
 
         if(effect == BREATHE)
         {
+            uint16_t delta_brightness = args[ARG_BREATHE_END] - args[ARG_BREATHE_START];
+            uint16_t progress = (args[ARG_BREATHE_END] * UINT8_MAX) -
+                                (d_time * delta_brightness * UINT8_MAX / times[TIME_FADEIN]);
+
             color[0] = colors[n_color++] * (uint32_t) progress / UINT16_MAX;
             color[1] = colors[n_color++] * (uint32_t) progress / UINT16_MAX;
             color[2] = colors[n_color] * (uint32_t) progress / UINT16_MAX;
         }
-        else if(effect == FADE)
+        else
         {
-            cross_fade(color, colors, m_color, n_color, progress);
-        }
-        else if(effect == RAINBOW)
-        {
-            rainbow_at_progress_full(color, progress, 255);
+            uint16_t progress = d_time * UINT16_MAX / times[TIME_FADEOUT];
+            if(effect == FADE)
+            {
+                cross_fade(color, colors, m_color, n_color, progress);
+            }
+            else
+            {
+                rainbow_at_progress_full(color, progress, 255);
+            }
         }
     }
 }
