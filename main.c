@@ -384,17 +384,17 @@ int main(void)
             if(globals.leds_enabled)
             {
                 device_profile pc = current_profile.devices[DEVICE_PC];
-                simple_effect(pc.effect, pc_buf, frame+frames[DEVICE_PC][5], frames[DEVICE_PC],
+                simple_effect(pc.effect, pc_buf, frame+frames[DEVICE_PC][TIME_DELAY], frames[DEVICE_PC],
                               pc.args, pc.colors, pc.color_count, pc.color_cycles);
                 device_profile gpu = current_profile.devices[DEVICE_GPU];
-                simple_effect(gpu.effect, gpu_buf, frame+frames[DEVICE_GPU][5], frames[DEVICE_GPU],
+                simple_effect(gpu.effect, gpu_buf, frame+frames[DEVICE_GPU][TIME_DELAY], frames[DEVICE_GPU],
                               gpu.args, gpu.colors, gpu.color_count, gpu.color_cycles);
 
                 for(uint8_t i = 0; i < globals.fan_count; ++i)
                 {
                     device_profile fan = current_profile.devices[DEVICE_FAN+i];
                     digital_effect(fan.effect, fan_buf+FAN_LED_COUNT*i, FAN_LED_COUNT, globals.fan_config[i],
-                                   frame+frames[DEVICE_FAN+i][5], frames[DEVICE_FAN+i], fan.args, fan.colors,
+                                   frame+frames[DEVICE_FAN+i][TIME_DELAY], frames[DEVICE_FAN+i], fan.args, fan.colors,
                                    fan.color_count, fan.color_cycles);
                 }
 

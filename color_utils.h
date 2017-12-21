@@ -44,6 +44,7 @@
 #define TIME_ON 2
 #define TIME_FADEOUT 3
 #define TIME_ROTATION 4
+#define TIME_DELAY 5
 
 
 typedef enum
