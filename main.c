@@ -393,8 +393,9 @@ int main(void)
                 for(uint8_t i = 0; i < globals.fan_count; ++i)
                 {
                     device_profile fan = current_profile.devices[DEVICE_FAN+i];
-                    digital_effect(fan.effect, fan_buf+FAN_LED_COUNT*i, FAN_LED_COUNT, globals.fan_config[i], frame,
-                                   frames[DEVICE_FAN+i], fan.args, fan.colors, fan.color_count, fan.color_cycles);
+                    digital_effect(fan.effect, fan_buf+FAN_LED_COUNT*i, FAN_LED_COUNT, globals.fan_config[i],
+                                   frame+frames[DEVICE_FAN+i][5], frames[DEVICE_FAN+i], fan.args, fan.colors,
+                                   fan.color_count, fan.color_cycles);
                 }
 
 
