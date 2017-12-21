@@ -1,7 +1,7 @@
 #ifndef LEDCONTROLLER_COLOR_UTILS_H
 #define LEDCONTROLLER_COLOR_UTILS_H
 
-#define actual_brightness(brightness) (brightness * brightness) / UINT8_MAX;
+#define actual_brightness(brightness) (brightness * brightness) / UINT8_MAX
 
 #define ARG_BIT_PACK 0
 

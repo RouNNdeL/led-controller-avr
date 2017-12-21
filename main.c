@@ -2,6 +2,7 @@
 #include <avr/interrupt.h>
 #include <stdlib.h>
 #include <avr/eeprom.h>
+#include <string.h>
 #include "color_utils.h"
 #include "eeprom.h"
 #include "uart.h"
@@ -12,7 +13,7 @@
 #define FPS 64
 
 #define BUTTON_MIN_FRAMES 2
-#define BUTTON_OFF_FRAMES 96
+#define BUTTON_OFF_FRAMES 64
 #define BUTTON_RESET_FRAMES 320
 
 #define FLAG_BUTTON (1 << 0)
@@ -23,26 +24,40 @@
 #define PIN_LED (1 << PA3)
 
 extern void output_grb_strip(uint8_t *ptr, uint16_t count);
+
 extern void output_grb_fan(uint8_t *ptr, uint16_t count);
 
 //TODO: Replace 3 with 12, as the ATmega1284P can fit more profiles then the ATmega328P
-profile EEMEM profiles[3];
+profile EEMEM profiles[8];
 global_settings EEMEM globals_addr;
 
-volatile uint8_t uart_control = 0x00;
-uint8_t uart_free = 1; /* 0 if we are currently receiving data, 1 otherwise */
-uint8_t fan_buf[FAN_LED_COUNT * 3];
-uint8_t strip_buf[STRIP_LED_COUNT * 3];
 global_settings globals;
 profile current_profile;
+
+volatile uint8_t uart_control = 0x00;
+volatile uint8_t uart_buffer[64];
+volatile uint8_t uart_buffer_length = 0;
+
+#define UART_FLAG_RECEIVE (1 << 0)
+#define UART_FLAG_LOCK (1 << 1)
+uint8_t uart_flags = 0;
+
+uint8_t fan_buf[FAN_LED_COUNT * 3];
+uint8_t strip_buf[STRIP_LED_COUNT * 3];
 
 volatile uint32_t frame = 1; /* 32 bits is enough for 2 years of continuous run at 64 fps */
 volatile uint8_t new_frame = 1;
 
-#define fetch_profile(n) eeprom_read_block(&current_profile, &profiles[n], PROFILE_LENGTH);
-#define get_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH);
-#define save_profile(p, n)eeprom_update_block(p, &profiles[n], PROFILE_LENGTH);
-#define save_globals() eeprom_update_block(&globals, &globals_addr, GLOBALS_LENGTH);
+#define fetch_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH)
+#define change_profile(n) eeprom_read_block(&current_profile, &profiles[n], PROFILE_LENGTH)
+#define save_profile(p, n) eeprom_update_block(&p, &profiles[n], PROFILE_LENGTH)
+#define save_globals() eeprom_update_block(&globals, &globals_addr, GLOBALS_LENGTH)
+
+#define output_pc(color) output_analog1(color[0], color[1], color[2])
+#define output_gpu(color) output_analog2(color[2], color[1], color[0])
+
+#define brightness(color) (actual_brightness(color)) * globals.brightness / UINT8_MAX
+#define increment_profile() globals.n_profile %= globals.n_profile+1; save_globals(); change_profile(globals.n_profile)
 
 void convert_bufs()
 {
@@ -51,9 +66,9 @@ void convert_bufs()
     {
         uint16_t index = i * 3;
 
-        fan_buf[index] = actual_brightness(fan_buf[index]);
-        fan_buf[index + 1] = actual_brightness(fan_buf[index + 1]);
-        fan_buf[index + 2] = actual_brightness(fan_buf[index + 2]);
+        fan_buf[index] = brightness(fan_buf[index]);
+        fan_buf[index + 1] = brightness(fan_buf[index + 1]);
+        fan_buf[index + 2] = brightness(fan_buf[index + 2]);
 
         uint8_t temp = fan_buf[index + 1];
         fan_buf[index + 1] = fan_buf[index];
@@ -64,9 +79,9 @@ void convert_bufs()
     {
         uint16_t index = i * 3;
 
-        strip_buf[index] = actual_brightness(strip_buf[index]);
-        strip_buf[index + 1] = actual_brightness(strip_buf[index + 1]);
-        strip_buf[index + 2] = actual_brightness(strip_buf[index + 2]);
+        strip_buf[index] = brightness(strip_buf[index]);
+        strip_buf[index + 1] = brightness(strip_buf[index + 1]);
+        strip_buf[index + 2] = brightness(strip_buf[index + 2]);
 
         uint8_t temp = strip_buf[index + 1];
         strip_buf[index + 1] = strip_buf[index];
@@ -79,16 +94,16 @@ void convert_bufs()
 
 void output_analog1(uint8_t q1, uint8_t q2, uint8_t q3)
 {
-    OCR0B = q1;
-    OCR1B = q2;
-    OCR1A = q3;
+    OCR0B = brightness(q1);
+    OCR1B = brightness(q2);
+    OCR1A = brightness(q3);
 }
 
 void output_analog2(uint8_t q4, uint8_t q5, uint8_t q6)
 {
-    OCR2B = q4;
-    OCR2A = q5;
-    OCR0A = q6;
+    OCR2B = brightness(q4);
+    OCR2A = brightness(q5);
+    OCR0A = brightness(q6);
 }
 
 uint16_t time_to_frames(uint8_t time)
@@ -127,15 +142,6 @@ void update()
 {
     output_grb_fan(fan_buf, sizeof(fan_buf));
     output_grb_strip(strip_buf, sizeof(strip_buf));
-
-    /*if(frame % 64)
-    {
-        PINA &= ~(1 << PA3);
-    }
-    else
-    {
-        PINA |= (1 << PA3);
-    }*/
 }
 
 void init_avr()
@@ -176,7 +182,7 @@ void init_eeprom()
 
     if(globals.leds_enabled)
     {
-        fetch_profile(globals.n_profile);
+        change_profile(globals.n_profile);
     }
 }
 
@@ -188,37 +194,53 @@ void process_uart()
         {
             case SAVE_PROFILE:
             {
-                uart_free = 0;
-                uint8_t n = uart_receive();            /* Get profile's index */
-                profile receive;
-                receive_bytes((uint8_t *) &receive, PROFILE_LENGTH); /* Receive the whole 320-byte profile */
-                uart_free = 1;
-                save_profile(&receive, n);             /* Save the received profile to eeprom */
+                if(!uart_flags & UART_FLAG_RECEIVE)
+                {
+                    uart_transmit(READY_TO_RECEIVE);
+                    uart_flags |= UART_FLAG_RECEIVE;
+                }
+                else if(uart_buffer_length >= DEVICE_LENGTH + 2)
+                {
+                    profile received;
+                    fetch_profile(received, uart_buffer[0]);
+
+                    /* Lock the buffer before reading it */
+                    uart_flags |= UART_FLAG_LOCK;
+                    memcpy(&(received.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
+                    uart_flags &= ~UART_FLAG_LOCK;
+
+                    save_profile(received, uart_buffer[0]);
+
+                    uart_transmit(RECEIVE_SUCCESS);
+
+                    uart_buffer_length = 0;
+                    uart_flags &= ~UART_FLAG_RECEIVE;
+                    uart_control = 0x00;
+                }
                 break;
             }
             case SAVE_GLOBALS:
             {
-                uart_free = 0;
-                receive_bytes((uint8_t *) &globals, GLOBALS_LENGTH);
-                uart_free = 1;
-                save_globals();
-                break;
-            }
-            case SEND_GLOBALS:
-            {
-                uart_free = 0;
-                transmit_bytes((uint8_t *) &globals, GLOBALS_LENGTH);
-                uart_free = 1;
-                break;
-            }
-            case SEND_PROFILE:
-            {
-                uart_free = 0;
-                uint8_t n = uart_receive();            /* Get profile's index */
-                profile transmit;
-                get_profile(transmit, n);
-                transmit_bytes((uint8_t *) &transmit, PROFILE_LENGTH);
-                uart_free = 1;
+                if(!uart_flags & UART_FLAG_RECEIVE)
+                {
+                    uart_transmit(READY_TO_RECEIVE);
+                    uart_flags |= UART_FLAG_RECEIVE;
+                }
+                else if(uart_buffer_length >= GLOBALS_LENGTH)
+                {
+                    /* Lock the buffer before reading it */
+                    uart_flags |= UART_FLAG_LOCK;
+                    memcpy(&globals, (const void *) (uart_buffer), GLOBALS_LENGTH);
+                    uart_flags &= ~UART_FLAG_LOCK;
+
+                    save_globals();
+
+                    uart_transmit(RECEIVE_SUCCESS);
+
+                    uart_buffer_length = 0;
+                    uart_flags &= ~UART_FLAG_RECEIVE;
+                    uart_control = 0x00;
+                }
                 break;
             }
             default:
@@ -226,7 +248,6 @@ void process_uart()
                 uart_transmit(UNRECOGNIZED_COMMAND);
             }
         }
-        uart_control = 0x00;
     }
 }
 
@@ -238,14 +259,12 @@ int main(void)
     uint32_t button_frame = 0;
     uint32_t reset_frame = 0;
     uint8_t flags = 0;
-    
-    uint8_t test_profile = 0;
-    uint8_t leds_on = 1;
 
     init_eeprom();
 
     while(1)
     {
+        //TODO: Fix a bug that causes the button to completely stop working after pressing it a couple times
         if((PINA & PIN_BUTTON) && !(flags & FLAG_BUTTON))
         {
             button_frame = frame;
@@ -254,33 +273,27 @@ int main(void)
         else if(button_frame && !(PINA & PIN_BUTTON))
         {
             uint32_t time = frame - button_frame;
-
-            if(time > BUTTON_MIN_FRAMES)
+            if(time < BUTTON_OFF_FRAMES && globals.leds_enabled)
             {
-                if(time < BUTTON_OFF_FRAMES && leds_on)
-                {
-                    //TODO: Change to the next profile, send serial event 'profile_n';
-                    test_profile = !test_profile;
-                }
-                else if(time < BUTTON_RESET_FRAMES)
-                {
-                    //TODO: Turn off/on the LEDs, send serial event 'leds_state'
-                    if(!leds_on)
-                    {
-                        frame = 0;
-                    }
-                    leds_on = !leds_on;
-                }
-                else
-                {
-                    PORTD |= PIN_RESET;
-                    flags |= FLAG_RESET;
-                    reset_frame = frame+32;
-                }
-
-                button_frame = 0;
-                flags &= ~FLAG_BUTTON;
+                //TODO: Change to the next profile, send serial event 'profile_n';
+                increment_profile();
+                frame = 0;
             }
+            else if(time < BUTTON_RESET_FRAMES)
+            {
+                //TODO: Turn off/on the LEDs, send serial event 'leds_state'
+                globals.leds_enabled = !globals.leds_enabled;
+                frame = 0;
+            }
+            else
+            {
+                PORTD |= PIN_RESET;
+                flags |= FLAG_RESET;
+                reset_frame = frame + 32;
+            }
+
+            button_frame = 0;
+            flags &= ~FLAG_BUTTON;
         }
 
         process_uart();
@@ -288,37 +301,18 @@ int main(void)
         if(new_frame)
         {
             new_frame = 0;
-            if(leds_on)
+
+            if(globals.leds_enabled)
             {
-                if(test_profile)
-                {
-                    uint16_t times[] = {0, 0, 0, 64 * 2, 0};
-                    uint8_t args[5];
-                    args[ARG_BIT_PACK] = SMOOTH;
-                    args[ARG_RAINBOW_BRIGHTNESS] = 200;
-                    args[ARG_RAINBOW_SOURCES] = 1;
-                    uint8_t colors[48];
 
-                    digital_effect(RAINBOW, fan_buf, FAN_LED_COUNT, 2, frame, times, args, colors, 1);
-                }
-                else
-                {
-                    uint16_t times[] = {0, 0, 0, 64 * 2, 0};
-                    uint8_t args[5];
-                    args[ARG_BIT_PACK] = SMOOTH;
-                    args[ARG_FILL_PIECE_COUNT] = 1;
-                    args[ARG_FILL_COLOR_COUNT] = 1;
-                    uint8_t colors[48];
-                    set_color(colors, 0, 255, 0, 0);
-                    set_color(colors, 1, 0, 255, 0);
-                    set_color(colors, 2, 0, 0, 255);
-
-                    digital_effect(FILLING_FADE, fan_buf, FAN_LED_COUNT, 2, frame, times, args, colors, 3);
-                }
             }
             else
             {
                 set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
+                set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT);
+
+                output_analog1(0, 0, 0);
+                output_analog2(0, 0, 0);
             }
 
             convert_bufs();
@@ -339,11 +333,20 @@ ISR(TIMER3_COMPA_vect)
     update();
 }
 
-ISR(USART_RX_vect)
+ISR(USART0_RX_vect)
 {
     uint8_t val = UDR0;
-    if(uart_free)
+    if(!uart_flags & UART_FLAG_RECEIVE)
     {
         uart_control = val;
+    }
+    else if(uart_buffer_length < sizeof(uart_buffer) && !uart_flags & UART_FLAG_LOCK)
+    {
+        uart_buffer[uart_buffer_length] = val;
+        uart_buffer_length++;
+    }
+    else
+    {
+        uart_transmit(BUFFER_OVERFLOW);
     }
 }

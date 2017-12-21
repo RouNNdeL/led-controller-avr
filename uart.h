@@ -3,6 +3,9 @@
 
 #include <avr/io.h>
 
+#define READY_TO_RECEIVE 0xA0
+#define RECEIVE_SUCCESS 0xA1
+
 #define SAVE_GLOBALS 0x10
 #define SAVE_PROFILE 0x11
 
@@ -10,8 +13,9 @@
 #define SEND_PROFILE 0x21
 
 #define UNRECOGNIZED_COMMAND 0xE0
+#define BUFFER_OVERFLOW 0xE1
 
-#define BAUD 9600
+#define BAUD 57600
 
 #include <util/setbaud.h>
 
