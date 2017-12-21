@@ -58,7 +58,7 @@ volatile uint8_t new_frame = 1;
 #define output_pc(color) output_analog1(color[0], color[1], color[2])
 #define output_gpu(color) output_analog2(color[2], color[1], color[0])
 
-#define brightness(color) (actual_brightness(color)) * globals.brightness / UINT8_MAX
+#define brightness(color) (color * globals.brightness) / UINT8_MAX
 #define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count; save_globals()
 #define refresh_profile() change_profile(globals.n_profile);convert_all_frames();
 
@@ -67,24 +67,24 @@ void convert_bufs()
     /* Convert from RGB to GRB expected by WS2812B and convert to actual brightness */
     for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
     {
-        uint16_t index = i * 3;
+        uint8_t index = i * 3;
 
-        fan_buf[index] = brightness(fan_buf[index]);
-        fan_buf[index + 1] = brightness(fan_buf[index + 1]);
-        fan_buf[index + 2] = brightness(fan_buf[index + 2]);
+        fan_buf[index] = actual_brightness(fan_buf[index]);
+        fan_buf[index + 1] = actual_brightness(fan_buf[index + 1]);
+        fan_buf[index + 2] = actual_brightness(fan_buf[index + 2]);
 
         uint8_t temp = fan_buf[index + 1];
         fan_buf[index + 1] = fan_buf[index];
         fan_buf[index] = temp;
     }
 
-    for(int i = 0; i < STRIP_LED_COUNT; ++i)
+    for(uint8_t i = 0; i < STRIP_LED_COUNT; ++i)
     {
         uint16_t index = i * 3;
 
-        strip_buf[index] = brightness(strip_buf[index]);
-        strip_buf[index + 1] = brightness(strip_buf[index + 1]);
-        strip_buf[index + 2] = brightness(strip_buf[index + 2]);
+        strip_buf[index] = actual_brightness(strip_buf[index]);
+        strip_buf[index + 1] = actual_brightness(strip_buf[index + 1]);
+        strip_buf[index + 2] = actual_brightness(strip_buf[index + 2]);
 
         uint8_t temp = strip_buf[index + 1];
         strip_buf[index + 1] = strip_buf[index];
@@ -92,21 +92,50 @@ void convert_bufs()
     }
 }
 
+void apply_brightness()
+{
+    for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
+    {
+        uint8_t index = i * 3;
+
+        fan_buf[index] = brightness(fan_buf[index]);
+        fan_buf[index + 1] = brightness(fan_buf[index + 1]);
+        fan_buf[index + 2] = brightness(fan_buf[index + 2]);
+    }
+
+    for(uint8_t i = 0; i < STRIP_LED_COUNT; ++i)
+    {
+        uint16_t index = i * 3;
+
+        strip_buf[index] = brightness(strip_buf[index]);
+        strip_buf[index + 1] = brightness(strip_buf[index + 1]);
+        strip_buf[index + 2] = brightness(strip_buf[index + 2]);
+    }
+
+    pc_buf[0] = brightness(pc_buf[0]);
+    pc_buf[1] = brightness(pc_buf[1]);
+    pc_buf[2] = brightness(pc_buf[2]);
+
+    gpu_buf[0] = brightness(gpu_buf[0]);
+    gpu_buf[1] = brightness(gpu_buf[1]);
+    gpu_buf[2] = brightness(gpu_buf[2]);
+}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
 
 void output_analog1(uint8_t q1, uint8_t q2, uint8_t q3)
 {
-    OCR0B = brightness(q1);
-    OCR1B = brightness(q2);
-    OCR1A = brightness(q3);
+    OCR0B = actual_brightness(q1);
+    OCR1B = actual_brightness(q2);
+    OCR1A = actual_brightness(q3);
 }
 
 void output_analog2(uint8_t q4, uint8_t q5, uint8_t q6)
 {
-    OCR2B = brightness(q4);
-    OCR2A = brightness(q5);
-    OCR0A = brightness(q6);
+    OCR2B = actual_brightness(q4);
+    OCR2A = actual_brightness(q5);
+    OCR0A = actual_brightness(q6);
 }
 
 uint16_t time_to_frames(uint8_t time)
@@ -375,6 +404,7 @@ int main(void)
                                strip.args, strip.colors, strip.color_count, strip.color_cycles);*/
 
                 convert_bufs();
+                apply_brightness();
             }
             else
             {
