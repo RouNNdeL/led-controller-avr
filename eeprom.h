@@ -28,11 +28,17 @@ typedef struct
     uint8_t profile_count;
     uint8_t n_profile;
     uint8_t leds_enabled;
+    uint8_t fan_count;
     uint8_t fan_config[3];
 } __attribute__((packed)) global_settings;
 
 #define GLOBALS_LENGTH sizeof(global_settings)
 #define DEVICE_LENGTH sizeof(device_profile)
 #define PROFILE_LENGTH sizeof(profile)
+
+#define DEVICE_PC 0
+#define DEVICE_GPU 1
+#define DEVICE_FAN 2
+#define DEVICE_STRIP 5
 
 #endif //LEDCONTROLLER_EEPROM_H

@@ -8,7 +8,8 @@
 #include "uart.h"
 
 #define FAN_LED_COUNT 12
-#define STRIP_LED_COUNT 1
+#define MAX_FAN_COUNT 3
+#define STRIP_LED_COUNT 0
 
 #define FPS 64
 
@@ -24,15 +25,14 @@
 #define PIN_LED (1 << PA3)
 
 extern void output_grb_strip(uint8_t *ptr, uint16_t count);
-
 extern void output_grb_fan(uint8_t *ptr, uint16_t count);
 
-//TODO: Replace 3 with 12, as the ATmega1284P can fit more profiles then the ATmega328P
 profile EEMEM profiles[8];
 global_settings EEMEM globals_addr;
 
 global_settings globals;
 profile current_profile;
+uint16_t frames[6][6];
 
 volatile uint8_t uart_control = 0x00;
 volatile uint8_t uart_buffer[64];
@@ -42,10 +42,12 @@ volatile uint8_t uart_buffer_length = 0;
 #define UART_FLAG_LOCK (1 << 1)
 uint8_t uart_flags = 0;
 
-uint8_t fan_buf[FAN_LED_COUNT * 3];
-uint8_t strip_buf[STRIP_LED_COUNT * 3];
+uint8_t fan_buf[FAN_LED_COUNT * MAX_FAN_COUNT * 3];
+uint8_t strip_buf[(STRIP_LED_COUNT+1) * 3];
+uint8_t pc_buf[3];
+uint8_t gpu_buf[3];
 
-volatile uint32_t frame = 1; /* 32 bits is enough for 2 years of continuous run at 64 fps */
+volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
 volatile uint8_t new_frame = 1;
 
 #define fetch_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH)
@@ -57,7 +59,7 @@ volatile uint8_t new_frame = 1;
 #define output_gpu(color) output_analog2(color[2], color[1], color[0])
 
 #define brightness(color) (actual_brightness(color)) * globals.brightness / UINT8_MAX
-#define increment_profile() globals.n_profile %= globals.n_profile+1; save_globals(); change_profile(globals.n_profile)
+#define increment_profile() globals.n_profile %= globals.n_profile+1; save_globals(); change_profile(globals.n_profile);convert_all_frames();
 
 void convert_bufs()
 {
@@ -136,12 +138,24 @@ void convert_to_frames(uint16_t *frames, uint8_t *times)
     frames[2] = time_to_frames(times[2]);
     frames[3] = time_to_frames(times[3]);
     frames[4] = time_to_frames(times[4]);
+    frames[5] = time_to_frames(times[5]);
+}
+
+void convert_all_frames()
+{
+    for(uint8_t i = 0; i < 6; ++i)
+    {
+        convert_to_frames(frames[i], current_profile.devices[i].timing);
+    }
 }
 
 void update()
 {
     output_grb_fan(fan_buf, sizeof(fan_buf));
     output_grb_strip(strip_buf, sizeof(strip_buf));
+
+    output_pc(pc_buf);
+    output_gpu(gpu_buf);
 }
 
 void init_avr()
@@ -172,7 +186,7 @@ void init_avr()
 
     sei();                   /* Enable global interrupts */
 
-    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT);
+    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT+1);
     set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
 }
 
@@ -180,10 +194,7 @@ void init_eeprom()
 {
     eeprom_read_block(&globals, &globals_addr, GLOBALS_LENGTH);
 
-    if(globals.leds_enabled)
-    {
-        change_profile(globals.n_profile);
-    }
+    change_profile(globals.n_profile);
 }
 
 void process_uart()
@@ -194,7 +205,7 @@ void process_uart()
         {
             case SAVE_PROFILE:
             {
-                if(!uart_flags & UART_FLAG_RECEIVE)
+                if(!(uart_flags & UART_FLAG_RECEIVE))
                 {
                     uart_transmit(READY_TO_RECEIVE);
                     uart_flags |= UART_FLAG_RECEIVE;
@@ -221,7 +232,7 @@ void process_uart()
             }
             case SAVE_GLOBALS:
             {
-                if(!uart_flags & UART_FLAG_RECEIVE)
+                if(!(uart_flags & UART_FLAG_RECEIVE))
                 {
                     uart_transmit(READY_TO_RECEIVE);
                     uart_flags |= UART_FLAG_RECEIVE;
@@ -283,6 +294,7 @@ int main(void)
             {
                 //TODO: Turn off/on the LEDs, send serial event 'leds_state'
                 globals.leds_enabled = !globals.leds_enabled;
+                save_globals();
                 frame = 0;
             }
             else
@@ -304,15 +316,32 @@ int main(void)
 
             if(globals.leds_enabled)
             {
+                device_profile pc = current_profile.devices[DEVICE_PC];
+                simple_effect(pc.effect, pc_buf, frame+frames[DEVICE_PC][5], frames[DEVICE_PC],
+                              pc.args, pc.colors, pc.color_count, pc.color_cycles);
+                device_profile gpu = current_profile.devices[DEVICE_GPU];
+                simple_effect(gpu.effect, gpu_buf, frame+frames[DEVICE_GPU][5], frames[DEVICE_GPU],
+                              gpu.args, gpu.colors, gpu.color_count, gpu.color_cycles);
 
+                for(uint8_t i = 0; i < globals.fan_count; ++i)
+                {
+                    device_profile fan = current_profile.devices[DEVICE_FAN+i];
+                    digital_effect(fan.effect, fan_buf+FAN_LED_COUNT*i, FAN_LED_COUNT, globals.fan_config[i], frame,
+                                   frames[DEVICE_FAN+i], fan.args, fan.colors, fan.color_count, fan.color_cycles);
+                }
+
+                /* Enable when the strip is installed */
+                /*device_profile strip = current_profile.devices[DEVICE_STRIP];
+                digital_effect(strip.effect, strip_buf+3, STRIP_LED_COUNT, 0, frame, frames[DEVICE_STRIP],
+                               strip.args, strip.colors, strip.color_count, strip.color_cycles);*/
             }
             else
             {
                 set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
-                set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT);
+                set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT+1);
 
-                output_analog1(0, 0, 0);
-                output_analog2(0, 0, 0);
+                set_color(pc_buf, 0, 0, 0, 0);
+                set_color(gpu_buf, 0, 0, 0, 0);
             }
 
             convert_bufs();
@@ -336,11 +365,11 @@ ISR(TIMER3_COMPA_vect)
 ISR(USART0_RX_vect)
 {
     uint8_t val = UDR0;
-    if(!uart_flags & UART_FLAG_RECEIVE)
+    if(!(uart_flags & UART_FLAG_RECEIVE))
     {
         uart_control = val;
     }
-    else if(uart_buffer_length < sizeof(uart_buffer) && !uart_flags & UART_FLAG_LOCK)
+    else if(uart_buffer_length < sizeof(uart_buffer) && !(uart_flags & UART_FLAG_LOCK))
     {
         uart_buffer[uart_buffer_length] = val;
         uart_buffer_length++;
