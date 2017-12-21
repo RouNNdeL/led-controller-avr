@@ -7,15 +7,15 @@
 #include "eeprom.h"
 #include "uart.h"
 
+#define FPS 64
+
+#define BUTTON_MIN_FRAMES 3
+#define BUTTON_OFF_FRAMES 1 * FPS
+#define BUTTON_RESET_FRAMES 5 * FPS
+
 #define FAN_LED_COUNT 12
 #define MAX_FAN_COUNT 3
 #define STRIP_LED_COUNT 0
-
-#define FPS 64
-
-#define BUTTON_MIN_FRAMES 2
-#define BUTTON_OFF_FRAMES 64
-#define BUTTON_RESET_FRAMES 320
 
 #define FLAG_BUTTON (1 << 0)
 #define FLAG_RESET (1 << 1)
@@ -25,6 +25,7 @@
 #define PIN_LED (1 << PA3)
 
 extern void output_grb_strip(uint8_t *ptr, uint16_t count);
+
 extern void output_grb_fan(uint8_t *ptr, uint16_t count);
 
 profile EEMEM profiles[8];
@@ -44,7 +45,7 @@ volatile uint8_t uart_buffer_length = 0;
 uint8_t uart_flags = 0;
 
 uint8_t fan_buf[FAN_LED_COUNT * MAX_FAN_COUNT * 3];
-uint8_t strip_buf[(STRIP_LED_COUNT+1) * 3];
+uint8_t strip_buf[(STRIP_LED_COUNT + 1) * 3];
 uint8_t pc_buf[3];
 uint8_t gpu_buf[3];
 
@@ -222,7 +223,7 @@ void init_avr()
 
     sei();                   /* Enable global interrupts */
 
-    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT+1);
+    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
     set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
 
     set_color(pc_buf, 0, 0, 0, 0);
@@ -331,6 +332,10 @@ void process_uart()
     }
 }
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "ImplicitIntegerAndEnumConversion"
+#pragma clang diagnostic ignored "-Wsign-conversion"
+
 int main(void)
 {
     init_avr();
@@ -353,25 +358,28 @@ int main(void)
         else if(button_frame && !(PINA & PIN_BUTTON))
         {
             uint32_t time = frame - button_frame;
-            if(time < BUTTON_OFF_FRAMES && globals.leds_enabled)
+            if(time > BUTTON_MIN_FRAMES)
             {
-                //TODO: Change to the next profile, send serial event 'profile_n';
-                increment_profile();
-                refresh_profile();
-                frame = 0;
-            }
-            else if(time < BUTTON_RESET_FRAMES)
-            {
-                //TODO: Turn off/on the LEDs, send serial event 'leds_state'
-                globals.leds_enabled = !globals.leds_enabled;
-                save_globals();
-                frame = 0;
-            }
-            else
-            {
-                PORTD |= PIN_RESET;
-                flags |= FLAG_RESET;
-                reset_frame = frame + 32;
+                if(time < BUTTON_OFF_FRAMES && globals.leds_enabled)
+                {
+                    uart_transmit(0xB0);
+                    increment_profile();
+                    refresh_profile();
+                    frame = 0;
+                }
+                else if(time < BUTTON_RESET_FRAMES)
+                {
+                    uart_transmit(0xB1);
+                    globals.leds_enabled = !globals.leds_enabled;
+                    save_globals();
+                    frame = 0;
+                }
+                else
+                {
+                    PORTD |= PIN_RESET;
+                    flags |= FLAG_RESET;
+                    reset_frame = frame + 32;
+                }
             }
 
             button_frame = 0;
@@ -383,7 +391,7 @@ int main(void)
         if(new_frame)
         {
             new_frame = 0;
-            if(auto_increment && frame%auto_increment == 0)
+            if(auto_increment && frame % auto_increment == 0)
             {
                 increment_profile();
                 refresh_profile();
@@ -393,17 +401,18 @@ int main(void)
             if(globals.leds_enabled)
             {
                 device_profile pc = current_profile.devices[DEVICE_PC];
-                simple_effect(pc.effect, pc_buf, frame+frames[DEVICE_PC][TIME_DELAY], frames[DEVICE_PC],
+                simple_effect(pc.effect, pc_buf, frame + frames[DEVICE_PC][TIME_DELAY], frames[DEVICE_PC],
                               pc.args, pc.colors, pc.color_count, pc.color_cycles);
                 device_profile gpu = current_profile.devices[DEVICE_GPU];
-                simple_effect(gpu.effect, gpu_buf, frame+frames[DEVICE_GPU][TIME_DELAY], frames[DEVICE_GPU],
+                simple_effect(gpu.effect, gpu_buf, frame + frames[DEVICE_GPU][TIME_DELAY], frames[DEVICE_GPU],
                               gpu.args, gpu.colors, gpu.color_count, gpu.color_cycles);
 
                 for(uint8_t i = 0; i < globals.fan_count; ++i)
                 {
-                    device_profile fan = current_profile.devices[DEVICE_FAN+i];
-                    digital_effect(fan.effect, fan_buf+FAN_LED_COUNT*i, FAN_LED_COUNT, globals.fan_config[i],
-                                   frame+frames[DEVICE_FAN+i][TIME_DELAY], frames[DEVICE_FAN+i], fan.args, fan.colors,
+                    device_profile fan = current_profile.devices[DEVICE_FAN + i];
+                    digital_effect(fan.effect, fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i],
+                                   frame + frames[DEVICE_FAN + i][TIME_DELAY], frames[DEVICE_FAN + i], fan.args,
+                                   fan.colors,
                                    fan.color_count, fan.color_cycles);
                 }
 
@@ -419,7 +428,7 @@ int main(void)
             else
             {
                 set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
-                set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT+1);
+                set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
 
                 set_color(pc_buf, 0, 0, 0, 0);
                 set_color(gpu_buf, 0, 0, 0, 0);
@@ -433,6 +442,8 @@ int main(void)
         }
     }
 }
+
+#pragma clang diagnostic pop
 
 ISR(TIMER3_COMPA_vect)
 {
