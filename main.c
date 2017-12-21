@@ -391,7 +391,7 @@ int main(void)
         if(new_frame)
         {
             new_frame = 0;
-            if(auto_increment && frame % auto_increment == 0)
+            if(auto_increment && frame && frame % auto_increment == 0)
             {
                 increment_profile();
                 refresh_profile();
