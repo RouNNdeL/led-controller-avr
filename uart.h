@@ -15,7 +15,7 @@
 #define UNRECOGNIZED_COMMAND 0xE0
 #define BUFFER_OVERFLOW 0xE1
 
-#define BAUD 57600
+#define BAUD 9600
 
 #include <util/setbaud.h>
 

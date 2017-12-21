@@ -59,7 +59,8 @@ volatile uint8_t new_frame = 1;
 #define output_gpu(color) output_analog2(color[2], color[1], color[0])
 
 #define brightness(color) (actual_brightness(color)) * globals.brightness / UINT8_MAX
-#define increment_profile() globals.n_profile %= globals.n_profile+1; save_globals(); change_profile(globals.n_profile);convert_all_frames();
+#define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count; save_globals()
+#define refresh_profile() change_profile(globals.n_profile);convert_all_frames();
 
 void convert_bufs()
 {
@@ -166,6 +167,11 @@ void init_avr()
     DDRC = 0x40; /* Pin PC6 as output, the rest as input */
     DDRD = 0xF4; /* Pis PD2 and PD4-PD7 as output, the rest as input */
 
+    PORTA = 0x00;
+    PORTB = 0x00;
+    PORTC = 0x00;
+    PORTD = 0x00;
+
     /* Initialize timer3 for time measurement */
     TCCR3B |= (1 << WGM32);  /* Set timer3 to CTC mode */
     TIMSK3 |= (1 << OCIE3A); /* Enable timer3 clear interrupt */
@@ -188,6 +194,9 @@ void init_avr()
 
     set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT+1);
     set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
+
+    set_color(pc_buf, 0, 0, 0, 0);
+    set_color(gpu_buf, 0, 0, 0, 0);
 }
 
 void init_eeprom()
@@ -195,6 +204,7 @@ void init_eeprom()
     eeprom_read_block(&globals, &globals_addr, GLOBALS_LENGTH);
 
     change_profile(globals.n_profile);
+    convert_all_frames();
 }
 
 void process_uart()
@@ -254,6 +264,33 @@ void process_uart()
                 }
                 break;
             }
+            case SEND_PROFILE:
+            {
+                if(!(uart_flags & UART_FLAG_RECEIVE))
+                {
+                    uart_transmit(READY_TO_RECEIVE);
+                    uart_flags |= UART_FLAG_RECEIVE;
+                }
+                else if(uart_buffer_length >= 1)
+                {
+                    /* Lock the buffer before reading it */
+                    profile transmit;
+                    fetch_profile(transmit, uart_buffer[0]);
+                    transmit_bytes((uint8_t *) &transmit, PROFILE_LENGTH);
+
+                    uart_buffer_length = 0;
+                    uart_flags &= ~UART_FLAG_RECEIVE;
+                    uart_control = 0x00;
+                }
+                break;
+            }
+            case SEND_GLOBALS:
+            {
+                transmit_bytes((uint8_t *) &globals, GLOBALS_LENGTH);
+                uart_buffer_length = 0;
+                uart_control = 0x00;
+                break;
+            }
             default:
             {
                 uart_transmit(UNRECOGNIZED_COMMAND);
@@ -288,6 +325,7 @@ int main(void)
             {
                 //TODO: Change to the next profile, send serial event 'profile_n';
                 increment_profile();
+                refresh_profile();
                 frame = 0;
             }
             else if(time < BUTTON_RESET_FRAMES)
@@ -330,10 +368,13 @@ int main(void)
                                    frames[DEVICE_FAN+i], fan.args, fan.colors, fan.color_count, fan.color_cycles);
                 }
 
+
                 /* Enable when the strip is installed */
                 /*device_profile strip = current_profile.devices[DEVICE_STRIP];
                 digital_effect(strip.effect, strip_buf+3, STRIP_LED_COUNT, 0, frame, frames[DEVICE_STRIP],
                                strip.args, strip.colors, strip.color_count, strip.color_cycles);*/
+
+                convert_bufs();
             }
             else
             {
@@ -343,8 +384,6 @@ int main(void)
                 set_color(pc_buf, 0, 0, 0, 0);
                 set_color(gpu_buf, 0, 0, 0, 0);
             }
-
-            convert_bufs();
 
             if((flags & FLAG_RESET) && frame > reset_frame)
             {
