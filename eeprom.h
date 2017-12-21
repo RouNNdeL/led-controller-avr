@@ -29,6 +29,7 @@ typedef struct
     uint8_t n_profile;
     uint8_t leds_enabled;
     uint8_t fan_count;
+    uint8_t auto_increment;
     uint8_t fan_config[3];
 } __attribute__((packed)) global_settings;
 

@@ -33,6 +33,7 @@ global_settings EEMEM globals_addr;
 global_settings globals;
 profile current_profile;
 uint16_t frames[6][6];
+uint16_t auto_increment;
 
 volatile uint8_t uart_control = 0x00;
 volatile uint8_t uart_buffer[64];
@@ -231,6 +232,7 @@ void init_avr()
 void init_eeprom()
 {
     eeprom_read_block(&globals, &globals_addr, GLOBALS_LENGTH);
+    auto_increment = time_to_frames(globals.auto_increment);
 
     change_profile(globals.n_profile);
     convert_all_frames();
@@ -284,6 +286,7 @@ void process_uart()
                     uart_flags &= ~UART_FLAG_LOCK;
 
                     save_globals();
+                    auto_increment = time_to_frames(globals.auto_increment);
 
                     uart_transmit(RECEIVE_SUCCESS);
 
@@ -380,6 +383,12 @@ int main(void)
         if(new_frame)
         {
             new_frame = 0;
+            if(auto_increment && frame%auto_increment == 0)
+            {
+                increment_profile();
+                refresh_profile();
+                frame = 0;
+            }
 
             if(globals.leds_enabled)
             {
