@@ -252,7 +252,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
             }
             else
             {
-                rainbow_at_progress_full(color, progress, 255);
+                rainbow_at_progress_full(color, progress, args[ARG_RAINBOW_BRIGHTNESS]);
             }
         }
     }
