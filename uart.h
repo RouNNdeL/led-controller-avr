@@ -3,14 +3,17 @@
 
 #include <avr/io.h>
 
-#define READY_TO_RECEIVE 0xA0
-#define RECEIVE_SUCCESS 0xA1
-
 #define SAVE_GLOBALS 0x10
 #define SAVE_PROFILE 0x11
 
 #define SEND_GLOBALS 0x20
 #define SEND_PROFILE 0x21
+
+#define READY_TO_RECEIVE 0xA0
+#define RECEIVE_SUCCESS 0xA1
+#define UART_READY 0xA2
+
+#define GLOBALS_UPDATED 0xB0
 
 #define UNRECOGNIZED_COMMAND 0xE0
 #define BUFFER_OVERFLOW 0xE1

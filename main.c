@@ -62,7 +62,7 @@ volatile uint8_t new_frame = 1;
 
 #define brightness(color) (color * globals.brightness) / UINT8_MAX
 #define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count; save_globals()
-#define refresh_profile() change_profile(globals.n_profile);convert_all_frames();
+#define refresh_profile() change_profile(globals.n_profile); convert_all_frames()
 
 void convert_bufs()
 {
@@ -263,7 +263,7 @@ void process_uart()
                     uart_flags &= ~UART_FLAG_LOCK;
 
                     save_profile(received, uart_buffer[0]);
-                    if(uart_buffer[1] == globals.n_profile)
+                    if(uart_buffer[0] == globals.n_profile)
                     {
                         refresh_profile();
                     }
@@ -352,7 +352,6 @@ int main(void)
 
     while(1)
     {
-        //TODO: Fix a bug that causes the button to completely stop working after pressing it a couple times
         if((PINA & PIN_BUTTON) && !(flags & FLAG_BUTTON))
         {
             button_frame = frame;
@@ -365,16 +364,16 @@ int main(void)
             {
                 if(time < BUTTON_OFF_FRAMES && globals.leds_enabled)
                 {
-                    uart_transmit(0xB0);
                     increment_profile();
                     refresh_profile();
+                    uart_transmit(GLOBALS_UPDATED);
                     frame = 0;
                 }
                 else if(time < BUTTON_RESET_FRAMES)
                 {
-                    uart_transmit(0xB1);
                     globals.leds_enabled = !globals.leds_enabled;
                     save_globals();
+                    uart_transmit(GLOBALS_UPDATED);
                     frame = 0;
                 }
                 else
@@ -398,6 +397,7 @@ int main(void)
             {
                 increment_profile();
                 refresh_profile();
+                uart_transmit(GLOBALS_UPDATED);
                 frame = 0;
             }
 
