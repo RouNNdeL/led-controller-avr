@@ -327,6 +327,30 @@ void process_uart()
                 uart_control = 0x00;
                 break;
             }
+            case TEMP_DEVICE:
+            {
+                if(!(uart_flags & UART_FLAG_RECEIVE))
+                {
+                    uart_transmit(READY_TO_RECEIVE);
+                    uart_flags |= UART_FLAG_RECEIVE;
+                }
+                else if(uart_buffer_length >= DEVICE_LENGTH + 2)
+                {
+                    /* Lock the buffer before reading it */
+                    uart_flags |= UART_FLAG_LOCK;
+                    memcpy(&(current_profile.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
+                    uart_flags &= ~UART_FLAG_LOCK;
+
+                    convert_all_frames();
+
+                    uart_transmit(RECEIVE_SUCCESS);
+
+                    uart_buffer_length = 0;
+                    uart_flags &= ~UART_FLAG_RECEIVE;
+                    uart_control = 0x00;
+                }
+                break;
+            }
             default:
             {
                 uart_transmit(UNRECOGNIZED_COMMAND);

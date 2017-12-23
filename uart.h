@@ -5,6 +5,7 @@
 
 #define SAVE_GLOBALS 0x10
 #define SAVE_PROFILE 0x11
+#define TEMP_DEVICE 0x12
 
 #define SEND_GLOBALS 0x20
 #define SEND_PROFILE 0x21
