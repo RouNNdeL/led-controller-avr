@@ -248,7 +248,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
             uint16_t progress = d_time * UINT16_MAX / times[TIME_FADEOUT];
             if(effect == FADE)
             {
-                cross_fade(color, colors, m_color, n_color, progress);
+                cross_fade(color, colors, n_color, m_color, progress);
             }
             else
             {
