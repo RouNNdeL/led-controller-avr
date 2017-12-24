@@ -432,7 +432,6 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     uint8_t n_color_for_piece = n_color + 3 * piece + 8 * arg_number;
                     uint8_t m_color_for_piece = m_color + 3 * piece + 8 * arg_number;
 
-
                     if(led_progress_current >= UINT8_MAX)
                     {
                         leds[index] = colors[n_color_for_piece];
@@ -453,8 +452,20 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                             }
                             else
                             {
-                                cross_fade(leds + index, colors, m_color_for_piece, n_color_for_piece,
-                                           led_progress_current * UINT8_MAX);
+                                if(args[ARG_BIT_PACK] & FADE_SMOOTH)
+                                {
+                                    uint8_t faded[6];
+                                    set_color(faded, 0, colors[n_color_for_piece],
+                                              colors[n_color_for_piece + 1], colors[n_color_for_piece + 2]);
+                                    cross_fade(faded + 3, colors, m_color_for_piece, n_color_for_piece, progress);
+                                    cross_fade(leds + index, faded, 3, 0,
+                                               led_progress_current * UINT8_MAX);
+                                }
+                                else
+                                {
+                                    cross_fade(leds + index, colors, m_color_for_piece, n_color_for_piece,
+                                               led_progress_current * UINT8_MAX);
+                                }
                             }
 
                             led_progress_current = 0;
@@ -469,9 +480,20 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                             }
                             else
                             {
-                                leds[index] = colors[m_color_for_piece];
-                                leds[index + 1] = colors[m_color_for_piece + 1];
-                                leds[index + 2] = colors[m_color_for_piece + 2];
+                                if(args[ARG_BIT_PACK] & FADE_SMOOTH)
+                                {
+                                    uint8_t faded[3];
+                                    cross_fade(faded, colors, m_color_for_piece, n_color_for_piece, progress);
+                                    leds[index] = faded[0];
+                                    leds[index + 1] = faded[1];
+                                    leds[index + 2] = faded[2];
+                                }
+                                else
+                                {
+                                    leds[index] = colors[m_color_for_piece];
+                                    leds[index + 1] = colors[m_color_for_piece + 1];
+                                    leds[index + 2] = colors[m_color_for_piece + 2];
+                                }
                             }
                         }
                     }
