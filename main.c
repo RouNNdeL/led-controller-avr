@@ -52,6 +52,10 @@ uint8_t gpu_buf[3];
 volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
 volatile uint8_t new_frame = 1;
 
+#define DEMO_LENGTH_SECONDS 0
+#define DEMO_LENGTH_FRAMES DEMO_LENGTH_SECONDS * FPS
+uint8_t demo = 0;
+
 #define fetch_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH)
 #define change_profile(n) eeprom_read_block(&current_profile, &profiles[n], PROFILE_LENGTH)
 #define save_profile(p, n) eeprom_update_block(&p, &profiles[n], PROFILE_LENGTH)
@@ -351,6 +355,14 @@ void process_uart()
                 }
                 break;
             }
+            case START_DEMO:
+            {
+                demo = 1;
+                frame = 0;
+                uart_transmit(RECEIVE_SUCCESS);
+                uart_control = 0x00;
+                break;
+            }
             default:
             {
                 uart_transmit(UNRECOGNIZED_COMMAND);
@@ -425,41 +437,54 @@ int main(void)
                 frame = 0;
             }
 
-            if(globals.leds_enabled)
+            if(demo)
             {
-                device_profile pc = current_profile.devices[DEVICE_PC];
-                simple_effect(pc.effect, pc_buf, frame + frames[DEVICE_PC][TIME_DELAY], frames[DEVICE_PC],
-                              pc.args, pc.colors, pc.color_count, pc.color_cycles);
-                device_profile gpu = current_profile.devices[DEVICE_GPU];
-                simple_effect(gpu.effect, gpu_buf, frame + frames[DEVICE_GPU][TIME_DELAY], frames[DEVICE_GPU],
-                              gpu.args, gpu.colors, gpu.color_count, gpu.color_cycles);
-
-                for(uint8_t i = 0; i < globals.fan_count; ++i)
+                //TODO: Add demo
+                if(frame > DEMO_LENGTH_FRAMES)
                 {
-                    device_profile fan = current_profile.devices[DEVICE_FAN + i];
-                    digital_effect(fan.effect, fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i],
-                                   frame + frames[DEVICE_FAN + i][TIME_DELAY], frames[DEVICE_FAN + i], fan.args,
-                                   fan.colors,
-                                   fan.color_count, fan.color_cycles);
+                    demo = 0;
+                    frame = 0;
                 }
-
-
-                /* Enable when the strip is installed */
-                /*device_profile strip = current_profile.devices[DEVICE_STRIP];
-                digital_effect(strip.effect, strip_buf+3, STRIP_LED_COUNT, 0, frame, frames[DEVICE_STRIP],
-                               strip.args, strip.colors, strip.color_count, strip.color_cycles);*/
-
-                convert_bufs();
-                apply_brightness();
             }
             else
             {
-                set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
-                set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
+                if(globals.leds_enabled)
+                {
+                    device_profile pc = current_profile.devices[DEVICE_PC];
+                    simple_effect(pc.effect, pc_buf, frame + frames[DEVICE_PC][TIME_DELAY], frames[DEVICE_PC],
+                                  pc.args, pc.colors, pc.color_count, pc.color_cycles);
+                    device_profile gpu = current_profile.devices[DEVICE_GPU];
+                    simple_effect(gpu.effect, gpu_buf, frame + frames[DEVICE_GPU][TIME_DELAY], frames[DEVICE_GPU],
+                                  gpu.args, gpu.colors, gpu.color_count, gpu.color_cycles);
 
-                set_color(pc_buf, 0, 0, 0, 0);
-                set_color(gpu_buf, 0, 0, 0, 0);
+                    for(uint8_t i = 0; i < globals.fan_count; ++i)
+                    {
+                        device_profile fan = current_profile.devices[DEVICE_FAN + i];
+                        digital_effect(fan.effect, fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i],
+                                       frame + frames[DEVICE_FAN + i][TIME_DELAY], frames[DEVICE_FAN + i], fan.args,
+                                       fan.colors,
+                                       fan.color_count, fan.color_cycles);
+                    }
+
+
+                    /* Enable when the strip is installed */
+                    /*device_profile strip = current_profile.devices[DEVICE_STRIP];
+                    digital_effect(strip.effect, strip_buf+3, STRIP_LED_COUNT, 0, frame, frames[DEVICE_STRIP],
+                                   strip.args, strip.colors, strip.color_count, strip.color_cycles);*/
+
+                    convert_bufs();
+                    apply_brightness();
+                }
+                else
+                {
+                    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
+                    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
+
+                    set_color(pc_buf, 0, 0, 0, 0);
+                    set_color(gpu_buf, 0, 0, 0, 0);
+                }
             }
+
 
             if((flags & FLAG_RESET) && frame > reset_frame)
             {
