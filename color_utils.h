@@ -26,8 +26,8 @@
 #define ARG_BREATHE_START 1
 #define ARG_BREATHE_END 2
 
-#define ARG_FILL_PIECE_COUNT 1
-#define ARG_FILL_COLOR_COUNT 2
+#define ARG_FILL_COLOR_COUNT 1
+#define ARG_FILL_PIECE_COUNT 2
 #define ARG_FILL_PIECE_DIRECTIONS1 3
 #define ARG_FILL_PIECE_DIRECTIONS2 4
 
@@ -73,5 +73,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
 
 void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t offset, uint32_t frame,
                     uint16_t *times, uint8_t *args, uint8_t *colors, uint8_t color_count, uint8_t color_cycles);
+
+void demo_full(uint8_t *fan_buf, uint8_t* pc_buf, uint8_t* gpu_buf, uint32_t frame);
 
 #endif //LEDCONTROLLER_COLOR_UTILS_H

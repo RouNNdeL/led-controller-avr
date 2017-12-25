@@ -346,7 +346,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     uint8_t index = (((direction ? i : led_count - i - 1))
                                      % piece_leds + piece * piece_leds + start_led) % led_count * 3;
 
-                    uint8_t n_color_for_piece = n_color + 3 * piece + 8 * arg_number;
+                    uint8_t n_color_for_piece = n_color + (3 * piece + 8 * arg_number) % args[ARG_FILL_COLOR_COUNT];
                     if(led_progress_current >= UINT8_MAX)
                     {
                         leds[index] = colors[n_color_for_piece];
@@ -399,7 +399,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         {
             uint16_t progress = UINT16_MAX - d_time * UINT16_MAX / times[TIME_FADEOUT];
 
-            uint8_t piece_leds = led_count / args[ARG_PIECES_PIECE_COUNT];
+            uint8_t piece_leds = led_count / args[ARG_FILL_PIECE_COUNT];
             uint16_t led_progress_base = effect != RAINBOW ?
                                          (progress * (uint32_t) piece_leds) / UINT8_MAX :
                                          UINT16_MAX / led_count; /* How much of progress is one LED */
@@ -429,8 +429,8 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                             (((direction ^ (args[ARG_BIT_PACK] & FILL_FADE_RETURN ? 1 : 0) ? led_count - i - 1 : i))
                              % piece_leds + piece * piece_leds + start_led) % led_count * 3;
 
-                    uint8_t n_color_for_piece = n_color + 3 * piece + 8 * arg_number;
-                    uint8_t m_color_for_piece = m_color + 3 * piece + 8 * arg_number;
+                    uint8_t n_color_for_piece = n_color + (3 * piece + 8 * arg_number) % args[ARG_FILL_COLOR_COUNT];
+                    uint8_t m_color_for_piece = m_color + (3 * piece + 8 * arg_number) % args[ARG_FILL_COLOR_COUNT];
 
                     if(led_progress_current >= UINT8_MAX)
                     {
@@ -602,6 +602,89 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         uint16_t piece_leds = (effect == ROTATING ? 1 : led_count / args[ARG_PIECES_PIECE_COUNT]) * UINT8_MAX;
 
         rotate_buf(leds, led_count, rotation_progress, start_led, piece_leds, args[ARG_BIT_PACK], c_colors, c_count);
+    }
+}
+
+void demo_full(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t frame)
+{
+    uint8_t colors[9];
+    set_color(colors, 0, 255, 0, 0);
+    set_color(colors, 1, 0, 255, 0);
+    set_color(colors, 2, 0, 0, 255);
+
+    if(frame <= 64)
+    {
+        uint16_t times[] = {0, 32, 0, 32, 0};
+        uint8_t args[] = {0, 0, 255, 0, 0};
+
+        digital_effect(BREATHE, fan_buf, 12, 2, frame, times, args, colors, 1, 1);
+        set_color(pc_buf, 0, 0, 0, 0);
+        set_color(gpu_buf, 0, 0, 0, 0);
+    }
+    else if((frame -= 64) <= 64)
+    {
+        uint16_t times[] = {0, 32, 0, 32, 0};
+        uint8_t args[] = {0, 0, 255, 0, 0};
+
+        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1);
+        set_color(pc_buf, 0, 0, 0, 0);
+        set_all_colors(fan_buf, 0, 0, 0, 12);
+    }
+    else if((frame -= 64) <= 64)
+    {
+        uint16_t times[] = {0, 32, 0, 32, 0};
+        uint8_t args[] = {0, 0, 255, 0, 0};
+
+        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1);
+        set_color(gpu_buf, 0, 0, 0, 0);
+        set_all_colors(fan_buf, 0, 0, 0, 12);
+    }
+    else if((frame -= 64) <= 64)
+    {
+        uint16_t times[] = {0, 32, 0, 32, 0};
+        uint8_t args[] = {0, 0, 255, 0, 0};
+
+        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1);
+        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1);
+        digital_effect(BREATHE, fan_buf, 12, 2, frame, times, args, colors, 1, 1);
+    }
+    else if((frame -= 64) <= 128)
+    {
+        uint16_t times1[] = {16, 0, 16, 0, 0};
+        uint16_t times2[] = {0, 32, 0, 32, 0};
+        uint8_t args1[] = {0, 0, 255, 0, 0};
+        uint8_t args2[] = {SMOOTH | DIRECTION, 1, 1, 0, 0};
+
+        set_color(pc_buf, 0, 0, 0, 0);
+        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors + 3, 2, 2);
+        digital_effect(FILL, fan_buf, 12, 2, frame, times2, args2, colors, 2, 1);
+    }
+    else if((frame -= 128) <= 128)
+    {
+        uint16_t times1[] = {12, 0, 6, 0, 0};
+        uint16_t times2[] = {0, 32, 0, 32, 0};
+        uint8_t args1[] = {0, 0, 255, 0, 0};
+        uint8_t args2[] = {SMOOTH | DIRECTION, 1, 1, 0, 0};
+
+        simple_effect(BREATHE, pc_buf, frame + 12, times1, args1, colors + 6, 1, 1);
+        simple_effect(BREATHE, gpu_buf, frame + 6, times1, args1, colors + 3, 2, 2);
+        digital_effect(BREATHE, fan_buf, 12, 2, frame, times1, args1, colors, 2, 1);
+    }
+    else if((frame -= 128) <= 128)
+    {
+        uint16_t times1[] = {16, 0, 16, 0, 0};
+        uint16_t times2[] = {0, 32, 0, 32, 0};
+        uint8_t args1[] = {0, 0, 255, 0, 0};
+        uint8_t args2[5];
+        args2[ARG_BIT_PACK] = SMOOTH;
+        args2[ARG_FILL_PIECE_COUNT] = 2;
+        args2[ARG_FILL_COLOR_COUNT] = 1;
+        args2[ARG_FILL_PIECE_DIRECTIONS1] = 0;
+        args2[ARG_FILL_PIECE_DIRECTIONS2] = 0;
+
+        set_color(pc_buf, 0, 0, 0, 0);
+        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors + 3, 2, 2);
+        digital_effect(FILL, fan_buf, 12, 2, frame, times2, args2, colors, 2, 1);
     }
 }
 
