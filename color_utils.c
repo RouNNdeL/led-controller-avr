@@ -605,7 +605,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
     }
 }
 
-void demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t frame)
+uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t frame)
 {
     uint8_t colors[12];
     set_color(colors, 0, 255, 0, 0);
@@ -620,7 +620,7 @@ void demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t fr
 
         digital_effect(BREATHE, fan_buf, 12, 2, frame + 8, times, args, colors + 9, 1, 1);
         simple_effect(BREATHE, gpu_buf, frame + 8, times, args, colors + 9, 1, 1);
-        simple_effect(BREATHE, gpu_buf, frame + 8, times, args, colors + 9, 1, 1);
+        simple_effect(BREATHE, pc_buf, frame + 8, times, args, colors + 9, 1, 1);
     }
     else if((frame -= 32) < 28)
     {
@@ -728,6 +728,50 @@ void demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t fr
         simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors + 3, 2, 2);
         digital_effect(FILL, fan_buf, 12, 2, frame, times2, args2, colors, 2, 1);
     }
+    else
+    { return 1; }
+    return 0;
+}
+
+uint8_t demo_effects(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t frame)
+{
+    if(frame < 384)
+    {
+        uint8_t colors[] = {255, 0, 0, 0, 255, 0, 0, 0, 255};
+
+        uint16_t times[] = {256, 64, 0, 64, 0};
+        uint8_t args[] = {0, 0, 255, 0, 0};
+
+        digital_effect(BREATHE, fan_buf, 12, 2, frame + 256, times, args, colors, 1, 1);
+        simple_effect(BREATHE, gpu_buf, frame + 128, times, args, colors + 3, 1, 1);
+        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1);
+    }
+    else if((frame -= 384) < 128)
+    {
+        uint8_t colors[] = {255, 0, 0, 0, 255, 0, 0, 0, 255};
+
+        uint16_t times[] = {0, 64, 0, 64, 0};
+        uint8_t args[] = {0, 0, 255, 0, 0};
+
+        digital_effect(BREATHE, fan_buf, 12, 2, frame, times, args, colors, 1, 1);
+        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1);
+        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1);
+    }
+    else if((frame -= 128) < 256)
+    {
+        uint8_t colors[] = {255, 0, 0, 0, 0, 255, 255, 0, 0, 0, 255, 0};
+
+        uint16_t times[] = {0, 0, 64, 32, 64 };
+        uint8_t args[] = {SMOOTH | DIRECTION, 2, 4};
+
+        set_color(pc_buf, 0, 0, 0, 0);
+        set_color(gpu_buf, 0, 0, 0, 0);
+
+        digital_effect(PIECES, fan_buf, 12, 2, frame, times, args, colors, 4, 1);
+    }
+    else
+    { return 1; }
+    return 0;
 }
 
 #pragma clang diagnostic pop

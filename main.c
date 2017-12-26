@@ -8,6 +8,7 @@
 #include "uart.h"
 
 #define FPS 64
+#define COMPILE_DEMOS 1 /* Demos take up a lot of memory, disable them here */
 
 #define BUTTON_MIN_FRAMES 3
 #define BUTTON_OFF_FRAMES 1 * FPS
@@ -52,8 +53,6 @@ uint8_t gpu_buf[3];
 volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
 volatile uint8_t new_frame = 1;
 
-#define DEMO_LENGTH_SECONDS 14
-#define DEMO_LENGTH_FRAMES DEMO_LENGTH_SECONDS * FPS
 uint8_t demo = 0;
 
 #define fetch_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH)
@@ -355,12 +354,17 @@ void process_uart()
                 }
                 break;
             }
-            case START_DEMO:
+            case START_DEMO_MUSIC:
+            case START_DEMO_EFFECTS:
             {
-                demo = 1;
+#if (COMPILE_DEMOS != 0)
+                demo = uart_control;
                 frame = 0;
                 uart_transmit(RECEIVE_SUCCESS);
                 uart_control = 0x00;
+#else
+                uart_transmit(DEMOS_DISABLED);
+#endif /* (COMPILE_DEMOS != 0) */
                 break;
             }
             default:
@@ -437,19 +441,32 @@ int main(void)
                 frame = 0;
             }
 
+#if (COMPILE_DEMOS != 0)
             if(demo)
             {
-                demo_music(fan_buf, pc_buf, gpu_buf, frame);
+                uint8_t demo_finished = 1;
+                switch(demo)
+                {
+                    case START_DEMO_MUSIC:
+                        demo_finished = demo_music(fan_buf, pc_buf, gpu_buf, frame);
+                        break;
+                    case START_DEMO_EFFECTS:
+                        demo_finished = demo_effects(fan_buf, pc_buf, gpu_buf, frame);
+                        break;
+                }
+
 
                 convert_bufs();
-                if(frame > DEMO_LENGTH_FRAMES)
+                if(demo_finished)
                 {
                     demo = 0;
                     frame = 0;
+                    uart_transmit(END_DEMO);
                 }
             }
             else
             {
+#endif /* (COMPILE_DEMOS != 0) */
                 if(globals.leds_enabled)
                 {
                     device_profile pc = current_profile.devices[DEVICE_PC];
@@ -485,7 +502,9 @@ int main(void)
                     set_color(pc_buf, 0, 0, 0, 0);
                     set_color(gpu_buf, 0, 0, 0, 0);
                 }
+#if (COMPILE_DEMOS != 0)
             }
+#endif /* (COMPILE_DEMOS != 0) */
 
 
             if((flags & FLAG_RESET) && frame > reset_frame)
