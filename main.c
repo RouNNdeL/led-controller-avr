@@ -52,7 +52,7 @@ uint8_t gpu_buf[3];
 volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
 volatile uint8_t new_frame = 1;
 
-#define DEMO_LENGTH_SECONDS 10
+#define DEMO_LENGTH_SECONDS 14
 #define DEMO_LENGTH_FRAMES DEMO_LENGTH_SECONDS * FPS
 uint8_t demo = 0;
 
@@ -439,7 +439,7 @@ int main(void)
 
             if(demo)
             {
-                demo_full(fan_buf, pc_buf, gpu_buf, frame);
+                demo_music(fan_buf, pc_buf, gpu_buf, frame);
 
                 convert_bufs();
                 if(frame > DEMO_LENGTH_FRAMES)
