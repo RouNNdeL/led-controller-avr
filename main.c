@@ -153,7 +153,7 @@ uint16_t time_to_frames(uint8_t time)
     {
         return time * FPS  / 8 - 5 * FPS ;
     }
-    if (time <= time)
+    if (time <= 160)
     {
         return time * FPS  / 2 - 50 * FPS ;
     }
@@ -297,12 +297,13 @@ void process_uart()
                 {
                     /* Lock the buffer before reading it */
                     uint8_t previous_profile = globals.n_profile;
+                    uint8_t previous_enabled = globals.leds_enabled;
                     uart_flags |= UART_FLAG_LOCK;
                     memcpy(&globals, (const void *) (uart_buffer), GLOBALS_LENGTH);
                     uart_flags &= ~UART_FLAG_LOCK;
 
                     save_globals();
-                    if(previous_profile != globals.n_profile)
+                    if(previous_profile != globals.n_profile || previous_enabled != globals.leds_enabled)
                     {
                         refresh_profile();
                         frame = 0;
