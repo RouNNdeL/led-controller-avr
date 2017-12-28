@@ -145,23 +145,31 @@ void output_analog2(uint8_t q4, uint8_t q5, uint8_t q6)
 
 uint16_t time_to_frames(uint8_t time)
 {
-    if(time <= 100)
+    if (time <= 80)
     {
-        return time * FPS / 8;
+        return time * FPS / 16;
     }
-    else if(time <= 180)
+    if (time <= 120)
     {
-        return time * FPS / 2 - FPS * 30;
+        return time * FPS  / 8 - 5 * FPS ;
     }
-    else if(time <= 240)
+    if (time <= time)
     {
-        return (time - 120) * FPS;
+        return time * FPS  / 2 - 50 * FPS ;
     }
-    else if(time <= 254)
+    if (time <= 190)
     {
-        return (time * 30 - 7080) * FPS;
+        return (time - 130) * FPS ;
     }
-    return 600 * FPS;
+    if (time <= 235)
+    {
+        return (2 * time - 320) * FPS ;
+    }
+    if (time <= 245)
+    {
+        return (15 * time - 3375) * FPS ;
+    }
+    return (60 * time - 14400) * FPS ;
 }
 
 #pragma clang diagnostic pop
@@ -288,11 +296,17 @@ void process_uart()
                 else if(uart_buffer_length >= GLOBALS_LENGTH)
                 {
                     /* Lock the buffer before reading it */
+                    uint8_t previous_profile = globals.n_profile;
                     uart_flags |= UART_FLAG_LOCK;
                     memcpy(&globals, (const void *) (uart_buffer), GLOBALS_LENGTH);
                     uart_flags &= ~UART_FLAG_LOCK;
 
                     save_globals();
+                    if(previous_profile != globals.n_profile)
+                    {
+                        refresh_profile();
+                        frame = 0;
+                    }
                     auto_increment = time_to_frames(globals.auto_increment);
 
                     uart_transmit(RECEIVE_SUCCESS);
