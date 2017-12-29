@@ -10,6 +10,11 @@
 #define FPS 64
 #define COMPILE_DEMOS 1 /* Demos take up a lot of memory, disable them here */
 
+/* Note: These change the color representation of a color */
+#define ACTUAL_BRIGHTNESS_DIGITAL 1 /* Whether to compile in use of log brightness function for WS2812B */
+#define ACTUAL_BRIGHTNESS_ANALOG1 1 /* Whether to compile in use of log brightness function for PC */
+#define ACTUAL_BRIGHTNESS_ANALOG2 0 /* Whether to compile in use of log brightness function for GPU */
+
 #define BUTTON_MIN_FRAMES 3
 #define BUTTON_OFF_FRAMES 1 * FPS
 #define BUTTON_RESET_FRAMES 5 * FPS
@@ -74,9 +79,11 @@ void convert_bufs()
     {
         uint8_t index = i * 3;
 
+#if (ACTUAL_BRIGHTNESS_DIGITAL != 0)
         fan_buf[index] = actual_brightness(fan_buf[index]);
         fan_buf[index + 1] = actual_brightness(fan_buf[index + 1]);
         fan_buf[index + 2] = actual_brightness(fan_buf[index + 2]);
+#endif /* #if (ACTUAL_BRIGHTNESS_DIGITAL != 0) */
 
         uint8_t temp = fan_buf[index + 1];
         fan_buf[index + 1] = fan_buf[index];
@@ -87,9 +94,11 @@ void convert_bufs()
     {
         uint16_t index = i * 3;
 
+#if (ACTUAL_BRIGHTNESS_DIGITAL != 0)
         strip_buf[index] = actual_brightness(strip_buf[index]);
         strip_buf[index + 1] = actual_brightness(strip_buf[index + 1]);
         strip_buf[index + 2] = actual_brightness(strip_buf[index + 2]);
+#endif /* #if (ACTUAL_BRIGHTNESS_DIGITAL != 0) */
 
         uint8_t temp = strip_buf[index + 1];
         strip_buf[index + 1] = strip_buf[index];
@@ -131,16 +140,28 @@ void apply_brightness()
 
 void output_analog1(uint8_t q1, uint8_t q2, uint8_t q3)
 {
+#if (ACTUAL_BRIGHTNESS_ANALOG1 != 0)
     OCR0B = actual_brightness(q1);
     OCR1B = actual_brightness(q2);
     OCR1A = actual_brightness(q3);
+#else
+    OCR0B = q1;
+    OCR1B = q2;
+    OCR1A = q3;
+#endif /* (ACTUAL_BRIGHTNESS_ANALOG1 != 0) */
 }
 
 void output_analog2(uint8_t q4, uint8_t q5, uint8_t q6)
 {
+#if (ACTUAL_BRIGHTNESS_ANALOG2 != 0)
     OCR2B = actual_brightness(q4);
     OCR2A = actual_brightness(q5);
     OCR0A = actual_brightness(q6);
+#else
+    OCR2B = q4;
+    OCR2A = q5;
+    OCR0A = q6;
+#endif /* (ACTUAL_BRIGHTNESS_ANALOG2 != 0) */
 }
 
 uint16_t time_to_frames(uint8_t time)
