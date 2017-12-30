@@ -37,7 +37,7 @@ set(AVR_L_FUSE 0xff)
 # name your project
 ##########################################################################
 project(LedController C ASM)
-set(SOURCE_FILES main.c color_utils.c uart.c ws2812b_strip.S ws2812b_fan.S)
+set(SOURCE_FILES main.c color_utils.c uart.c ws2812b_strip.S ws2812b_fan.S config.h color_utils.h eeprom.h uart.h)
 
 ##################################################################################
 # status messages
