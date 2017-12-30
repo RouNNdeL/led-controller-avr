@@ -423,8 +423,11 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                         }
                     }
 
-                    uint8_t direction = (arg_number ? args[ARG_FILL_PIECE_DIRECTIONS2] :
-                                         args[ARG_FILL_PIECE_DIRECTIONS1]) & (1 << piece);
+                    uint8_t direction = ((arg_number ? args[ARG_FILL_PIECE_DIRECTIONS2] :
+                                         args[ARG_FILL_PIECE_DIRECTIONS1]) & (1 << piece)) ? 1 : 0;
+
+                    if(effect == FILLING_FADE && (args[ARG_BIT_PACK] & FILL_FADE_RETURN) && (frame / sum) % 2 == 0)
+                        direction = direction ? 0 : 1;
                     uint8_t index =
                             (((direction ^ (args[ARG_BIT_PACK] & FILL_FADE_RETURN ? 1 : 0) ? led_count - i - 1 : i))
                              % piece_leds + piece * piece_leds + start_led) % led_count * 3;
@@ -761,7 +764,7 @@ uint8_t demo_effects(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32
     {
         uint8_t colors[] = {255, 0, 0, 0, 0, 255, 255, 0, 0, 0, 255, 0};
 
-        uint16_t times[] = {0, 0, 64, 32, 64 };
+        uint16_t times[] = {0, 0, 64, 32, 64};
         uint8_t args[] = {SMOOTH | DIRECTION, 2, 4};
 
         set_color(pc_buf, 0, 0, 0, 0);
