@@ -346,7 +346,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     uint8_t index = (((direction ? i : led_count - i - 1))
                                      % piece_leds + piece * piece_leds + start_led) % led_count * 3;
 
-                    uint8_t n_color_for_piece = n_color + (3 * piece + 8 * arg_number) % args[ARG_FILL_COLOR_COUNT];
+                    uint8_t n_color_for_piece = n_color + 3 * (((piece + 8 * arg_number)) % args[ARG_FILL_COLOR_COUNT]);
                     if(led_progress_current >= UINT8_MAX)
                     {
                         leds[index] = colors[n_color_for_piece];
@@ -429,8 +429,8 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                             (((direction ^ (args[ARG_BIT_PACK] & FILL_FADE_RETURN ? 1 : 0) ? led_count - i - 1 : i))
                              % piece_leds + piece * piece_leds + start_led) % led_count * 3;
 
-                    uint8_t n_color_for_piece = n_color + (3 * piece + 8 * arg_number) % args[ARG_FILL_COLOR_COUNT];
-                    uint8_t m_color_for_piece = m_color + (3 * piece + 8 * arg_number) % args[ARG_FILL_COLOR_COUNT];
+                    uint8_t n_color_for_piece = n_color + 3 * (((piece + 8 * arg_number)) % args[ARG_FILL_COLOR_COUNT]);
+                    uint8_t m_color_for_piece = m_color + 3 * (((piece + 8 * arg_number)) % args[ARG_FILL_COLOR_COUNT]);
 
                     if(led_progress_current >= UINT8_MAX)
                     {
