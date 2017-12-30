@@ -389,7 +389,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
 
                 uint8_t index = (i + start_led) % led_count * 3;
 
-                uint8_t n_color_for_piece = n_color + 3 * piece;
+                uint8_t n_color_for_piece = n_color + 3 * (piece % args[ARG_FILL_COLOR_COUNT]);
                 leds[index] = colors[n_color_for_piece];
                 leds[index + 1] = colors[n_color_for_piece + 1];
                 leds[index + 2] = colors[n_color_for_piece + 2];
@@ -424,7 +424,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     }
 
                     uint8_t direction = ((arg_number ? args[ARG_FILL_PIECE_DIRECTIONS2] :
-                                         args[ARG_FILL_PIECE_DIRECTIONS1]) & (1 << piece)) ? 1 : 0;
+                                          args[ARG_FILL_PIECE_DIRECTIONS1]) & (1 << piece)) ? 1 : 0;
 
                     if(effect == FILLING_FADE && (args[ARG_BIT_PACK] & FILL_FADE_RETURN) && (frame / sum) % 2 == 0)
                         direction = direction ? 0 : 1;
