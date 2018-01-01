@@ -10,6 +10,8 @@
 
 #define FLAG_BUTTON (1 << 0)
 #define FLAG_RESET (1 << 1)
+#define FLAG_PROFILE_UPDATED (1 << 2)
+uint8_t flags = 0;
 
 #define PIN_RESET (1 << PD2)
 #define PIN_BUTTON (1 << PA4)
@@ -35,6 +37,8 @@ volatile uint8_t uart_buffer_length = 0;
 #define UART_FLAG_LOCK (1 << 1)
 uint8_t uart_flags = 0;
 
+#define reset_uart() uart_buffer_length = 0;uart_flags &= ~UART_FLAG_RECEIVE;uart_control = 0x00
+
 uint8_t fan_buf[FAN_LED_COUNT * MAX_FAN_COUNT * 3];
 uint8_t strip_buf[(STRIP_LED_COUNT + 1) * 3];
 uint8_t pc_buf[3];
@@ -54,7 +58,7 @@ uint8_t demo = 0;
 #define output_gpu(color) output_analog2(color[2], color[1], color[0])
 
 #define brightness(color) (color * globals.brightness) / UINT8_MAX
-#define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count; save_globals()
+#define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count;
 #define refresh_profile() change_profile(globals.n_profile); convert_all_frames()
 
 void convert_bufs()
@@ -151,31 +155,31 @@ void output_analog2(uint8_t q4, uint8_t q5, uint8_t q6)
 
 uint16_t time_to_frames(uint8_t time)
 {
-    if (time <= 80)
+    if(time <= 80)
     {
         return time * FPS / 16;
     }
-    if (time <= 120)
+    if(time <= 120)
     {
-        return time * FPS  / 8 - 5 * FPS ;
+        return time * FPS / 8 - 5 * FPS;
     }
-    if (time <= 160)
+    if(time <= 160)
     {
-        return time * FPS  / 2 - 50 * FPS ;
+        return time * FPS / 2 - 50 * FPS;
     }
-    if (time <= 190)
+    if(time <= 190)
     {
-        return (time - 130) * FPS ;
+        return (time - 130) * FPS;
     }
-    if (time <= 235)
+    if(time <= 235)
     {
-        return (2 * time - 320) * FPS ;
+        return (2 * time - 320) * FPS;
     }
-    if (time <= 245)
+    if(time <= 245)
     {
-        return (15 * time - 3375) * FPS ;
+        return (15 * time - 3375) * FPS;
     }
-    return (60 * time - 14400) * FPS ;
+    return (60 * time - 14400) * FPS;
 }
 
 #pragma clang diagnostic pop
@@ -271,24 +275,39 @@ void process_uart()
                 }
                 else if(uart_buffer_length >= DEVICE_LENGTH + 2)
                 {
-                    profile received;
-                    fetch_profile(received, uart_buffer[0]);
-
-                    /* Lock the buffer before reading it */
-                    uart_flags |= UART_FLAG_LOCK;
-                    memcpy(&(received.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
-                    uart_flags &= ~UART_FLAG_LOCK;
-
-                    save_profile(received, uart_buffer[0]);
-                    if(uart_buffer[0] == globals.n_profile)
+                    /*
+                     * Do not immediately write to EEPROM if the profile being modified is the current one,
+                     * instead write to the variable itself and set an update flag.
+                     */
+                    if(globals.n_profile == uart_buffer[0])
                     {
-                        refresh_profile();
+                        /* Lock the buffer before reading it */
+                        uart_flags |= UART_FLAG_LOCK;
+                        memcpy(&(current_profile.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
+                        uart_flags &= ~UART_FLAG_LOCK;
+                        convert_to_frames(frames[uart_buffer[1]], current_profile.devices[uart_buffer[1]].timing);
+
+                        flags |= FLAG_PROFILE_UPDATED;
+                    }
+                    else
+                    {
+                        profile received;
+                        fetch_profile(received, uart_buffer[0]);
+
+                        /* Lock the buffer before reading it */
+                        uart_flags |= UART_FLAG_LOCK;
+                        memcpy(&(received.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
+                        uart_flags &= ~UART_FLAG_LOCK;
+
+                        save_profile(received, uart_buffer[0]);
+                        if(uart_buffer[0] == globals.n_profile)
+                        {
+                            refresh_profile();
+                        }
                     }
                     uart_transmit(RECEIVE_SUCCESS);
 
-                    uart_buffer_length = 0;
-                    uart_flags &= ~UART_FLAG_RECEIVE;
-                    uart_control = 0x00;
+                    reset_uart();
                 }
                 break;
             }
@@ -318,9 +337,7 @@ void process_uart()
 
                     uart_transmit(RECEIVE_SUCCESS);
 
-                    uart_buffer_length = 0;
-                    uart_flags &= ~UART_FLAG_RECEIVE;
-                    uart_control = 0x00;
+                    reset_uart();
                 }
                 break;
             }
@@ -338,9 +355,7 @@ void process_uart()
                     fetch_profile(transmit, uart_buffer[0]);
                     transmit_bytes((uint8_t *) &transmit, PROFILE_LENGTH);
 
-                    uart_buffer_length = 0;
-                    uart_flags &= ~UART_FLAG_RECEIVE;
-                    uart_control = 0x00;
+                    reset_uart();
                 }
                 break;
             }
@@ -369,9 +384,7 @@ void process_uart()
 
                     uart_transmit(RECEIVE_SUCCESS);
 
-                    uart_buffer_length = 0;
-                    uart_flags &= ~UART_FLAG_RECEIVE;
-                    uart_control = 0x00;
+                    reset_uart();
                 }
                 break;
             }
@@ -381,11 +394,22 @@ void process_uart()
 #if (COMPILE_DEMOS != 0)
                 demo = uart_control;
                 frame = 0;
-                uart_transmit(RECEIVE_SUCCESS);
-                uart_control = 0x00;
+                reset_uart();
 #else
                 uart_transmit(DEMOS_DISABLED);
 #endif /* (COMPILE_DEMOS != 0) */
+                break;
+            }
+            case SAVE_EXPLICIT:
+            {
+                if(flags & FLAG_PROFILE_UPDATED)
+                {
+                    save_profile(current_profile, globals.n_profile);
+                    flags &= ~FLAG_PROFILE_UPDATED;
+                }
+                uart_transmit(RECEIVE_SUCCESS);
+
+                reset_uart();
                 break;
             }
             default:
@@ -407,7 +431,6 @@ int main(void)
 
     uint32_t button_frame = 0;
     uint32_t reset_frame = 0;
-    uint8_t flags = 0;
 
     init_eeprom();
 
@@ -423,9 +446,15 @@ int main(void)
             uint32_t time = frame - button_frame;
             if(time > BUTTON_MIN_FRAMES)
             {
+                if(flags & FLAG_PROFILE_UPDATED)
+                {
+                    save_profile(current_profile, globals.n_profile);
+                    flags &= ~FLAG_PROFILE_UPDATED;
+                }
                 if(time < BUTTON_OFF_FRAMES && globals.leds_enabled)
                 {
                     increment_profile();
+                    save_globals();
                     refresh_profile();
                     uart_transmit(GLOBALS_UPDATED);
                     frame = 0;
@@ -488,41 +517,41 @@ int main(void)
             else
             {
 #endif /* (COMPILE_DEMOS != 0) */
-                if(globals.leds_enabled)
+            if(globals.leds_enabled)
+            {
+                device_profile pc = current_profile.devices[DEVICE_PC];
+                simple_effect(pc.effect, pc_buf, frame + frames[DEVICE_PC][TIME_DELAY], frames[DEVICE_PC],
+                              pc.args, pc.colors, pc.color_count, pc.color_cycles);
+                device_profile gpu = current_profile.devices[DEVICE_GPU];
+                simple_effect(gpu.effect, gpu_buf, frame + frames[DEVICE_GPU][TIME_DELAY], frames[DEVICE_GPU],
+                              gpu.args, gpu.colors, gpu.color_count, gpu.color_cycles);
+
+                for(uint8_t i = 0; i < globals.fan_count; ++i)
                 {
-                    device_profile pc = current_profile.devices[DEVICE_PC];
-                    simple_effect(pc.effect, pc_buf, frame + frames[DEVICE_PC][TIME_DELAY], frames[DEVICE_PC],
-                                  pc.args, pc.colors, pc.color_count, pc.color_cycles);
-                    device_profile gpu = current_profile.devices[DEVICE_GPU];
-                    simple_effect(gpu.effect, gpu_buf, frame + frames[DEVICE_GPU][TIME_DELAY], frames[DEVICE_GPU],
-                                  gpu.args, gpu.colors, gpu.color_count, gpu.color_cycles);
-
-                    for(uint8_t i = 0; i < globals.fan_count; ++i)
-                    {
-                        device_profile fan = current_profile.devices[DEVICE_FAN + i];
-                        digital_effect(fan.effect, fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i],
-                                       frame + frames[DEVICE_FAN + i][TIME_DELAY], frames[DEVICE_FAN + i], fan.args,
-                                       fan.colors,
-                                       fan.color_count, fan.color_cycles);
-                    }
-
-
-                    /* Enable when the strip is installed */
-                    /*device_profile strip = current_profile.devices[DEVICE_STRIP];
-                    digital_effect(strip.effect, strip_buf+3, STRIP_LED_COUNT, 0, frame, frames[DEVICE_STRIP],
-                                   strip.args, strip.colors, strip.color_count, strip.color_cycles);*/
-
-                    convert_bufs();
-                    apply_brightness();
+                    device_profile fan = current_profile.devices[DEVICE_FAN + i];
+                    digital_effect(fan.effect, fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i],
+                                   frame + frames[DEVICE_FAN + i][TIME_DELAY], frames[DEVICE_FAN + i], fan.args,
+                                   fan.colors,
+                                   fan.color_count, fan.color_cycles);
                 }
-                else
-                {
-                    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
-                    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
 
-                    set_color(pc_buf, 0, 0, 0, 0);
-                    set_color(gpu_buf, 0, 0, 0, 0);
-                }
+
+                /* Enable when the strip is installed */
+                /*device_profile strip = current_profile.devices[DEVICE_STRIP];
+                digital_effect(strip.effect, strip_buf+3, STRIP_LED_COUNT, 0, frame, frames[DEVICE_STRIP],
+                               strip.args, strip.colors, strip.color_count, strip.color_cycles);*/
+
+                convert_bufs();
+                apply_brightness();
+            }
+            else
+            {
+                set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
+                set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
+
+                set_color(pc_buf, 0, 0, 0, 0);
+                set_color(gpu_buf, 0, 0, 0, 0);
+            }
 #if (COMPILE_DEMOS != 0)
             }
 #endif /* (COMPILE_DEMOS != 0) */
