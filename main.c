@@ -300,10 +300,6 @@ void process_uart()
                         uart_flags &= ~UART_FLAG_LOCK;
 
                         save_profile(received, uart_buffer[0]);
-                        if(uart_buffer[0] == globals.n_profile)
-                        {
-                            refresh_profile();
-                        }
                     }
                     uart_transmit(RECEIVE_SUCCESS);
 
