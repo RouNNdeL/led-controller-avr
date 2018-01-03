@@ -21,7 +21,7 @@ extern void output_grb_strip(uint8_t *ptr, uint16_t count);
 
 extern void output_grb_fan(uint8_t *ptr, uint16_t count);
 
-profile EEMEM profiles[8];
+profile EEMEM profiles[PROFILE_COUNT];
 global_settings EEMEM globals_addr;
 
 global_settings globals;
@@ -275,33 +275,41 @@ void process_uart()
                 }
                 else if(uart_buffer_length >= DEVICE_LENGTH + 2)
                 {
-                    /*
-                     * Do not immediately write to EEPROM if the profile being modified is the current one,
-                     * instead write to the variable itself and set an update flag.
-                     */
-                    if(globals.n_profile == uart_buffer[0])
+                    if(uart_buffer[0] < PROFILE_COUNT)
                     {
-                        /* Lock the buffer before reading it */
-                        uart_flags |= UART_FLAG_LOCK;
-                        memcpy(&(current_profile.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
-                        uart_flags &= ~UART_FLAG_LOCK;
-                        convert_to_frames(frames[uart_buffer[1]], current_profile.devices[uart_buffer[1]].timing);
+                        /*
+                         * Do not immediately write to EEPROM if the profile being modified is the current one,
+                         * instead write to the variable itself and set an update flag.
+                         */
+                        if(globals.n_profile == uart_buffer[0])
+                        {
+                            /* Lock the buffer before reading it */
+                            uart_flags |= UART_FLAG_LOCK;
+                            memcpy(&(current_profile.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
+                            uart_flags &= ~UART_FLAG_LOCK;
+                            convert_to_frames(frames[uart_buffer[1]], current_profile.devices[uart_buffer[1]].timing);
 
-                        flags |= FLAG_PROFILE_UPDATED;
+                            flags |= FLAG_PROFILE_UPDATED;
+                        }
+                        else
+                        {
+                            profile received;
+                            fetch_profile(received, uart_buffer[0]);
+
+                            /* Lock the buffer before reading it */
+                            uart_flags |= UART_FLAG_LOCK;
+                            memcpy(&(received.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
+                            uart_flags &= ~UART_FLAG_LOCK;
+
+                            save_profile(received, uart_buffer[0]);
+                        }
+                        uart_transmit(RECEIVE_SUCCESS);
                     }
                     else
                     {
-                        profile received;
-                        fetch_profile(received, uart_buffer[0]);
-
-                        /* Lock the buffer before reading it */
-                        uart_flags |= UART_FLAG_LOCK;
-                        memcpy(&(received.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
-                        uart_flags &= ~UART_FLAG_LOCK;
-
-                        save_profile(received, uart_buffer[0]);
+                        uart_transmit(PROFILE_OVERFLOW);
                     }
-                    uart_transmit(RECEIVE_SUCCESS);
+
 
                     reset_uart();
                 }
@@ -346,10 +354,17 @@ void process_uart()
                 }
                 else if(uart_buffer_length >= 1)
                 {
-                    /* Lock the buffer before reading it */
-                    profile transmit;
-                    fetch_profile(transmit, uart_buffer[0]);
-                    transmit_bytes((uint8_t *) &transmit, PROFILE_LENGTH);
+                    if(uart_buffer[0] < PROFILE_COUNT)
+                    {
+                        /* Lock the buffer before reading it */
+                        profile transmit;
+                        fetch_profile(transmit, uart_buffer[0]);
+                        transmit_bytes((uint8_t *) &transmit, PROFILE_LENGTH);
+                    }
+                    else
+                    {
+                        uart_transmit(PROFILE_OVERFLOW);
+                    }
 
                     reset_uart();
                 }
