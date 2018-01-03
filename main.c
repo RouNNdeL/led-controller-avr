@@ -58,8 +58,14 @@ uint8_t demo = 0;
 #define output_gpu(color) output_analog2(color[2], color[1], color[0])
 
 #define brightness(color) (color * globals.brightness) / UINT8_MAX
-#define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count;
+#define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count
 #define refresh_profile() change_profile(globals.n_profile); convert_all_frames()
+
+#define simple(buf, n) simple_effect(current_profile.devices[n].effect, buf, frame + frames[n][TIME_DELAY], frames[n],\
+current_profile.devices[n].args, current_profile.devices[n].colors, current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
+
+#define digital(buf, count, offset, n) digital_effect(current_profile.devices[n].effect, buf, count, offset, frame + frames[n][TIME_DELAY], frames[n],\
+current_profile.devices[n].args, current_profile.devices[n].colors, current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
 
 void convert_bufs()
 {
@@ -530,27 +536,16 @@ int main(void)
 #endif /* (COMPILE_DEMOS != 0) */
             if(globals.leds_enabled)
             {
-                device_profile pc = current_profile.devices[DEVICE_PC];
-                simple_effect(pc.effect, pc_buf, frame + frames[DEVICE_PC][TIME_DELAY], frames[DEVICE_PC],
-                              pc.args, pc.colors, pc.color_count, pc.color_cycles);
-                device_profile gpu = current_profile.devices[DEVICE_GPU];
-                simple_effect(gpu.effect, gpu_buf, frame + frames[DEVICE_GPU][TIME_DELAY], frames[DEVICE_GPU],
-                              gpu.args, gpu.colors, gpu.color_count, gpu.color_cycles);
+                simple(pc_buf, DEVICE_PC);
+                simple(gpu_buf, DEVICE_GPU);
 
                 for(uint8_t i = 0; i < globals.fan_count; ++i)
                 {
-                    device_profile fan = current_profile.devices[DEVICE_FAN + i];
-                    digital_effect(fan.effect, fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i],
-                                   frame + frames[DEVICE_FAN + i][TIME_DELAY], frames[DEVICE_FAN + i], fan.args,
-                                   fan.colors,
-                                   fan.color_count, fan.color_cycles);
+                    digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN+i);
                 }
 
-
                 /* Enable when the strip is installed */
-                /*device_profile strip = current_profile.devices[DEVICE_STRIP];
-                digital_effect(strip.effect, strip_buf+3, STRIP_LED_COUNT, 0, frame, frames[DEVICE_STRIP],
-                               strip.args, strip.colors, strip.color_count, strip.color_cycles);*/
+                /*digital(strip_buf, STRIP_LED_COUNT, 0, DEVICE_STRIP);*/
 
                 convert_bufs();
                 apply_brightness();
