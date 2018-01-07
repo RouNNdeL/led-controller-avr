@@ -59,7 +59,7 @@ uint8_t demo = 0;
 
 #define brightness(color) (color * globals.brightness) / UINT8_MAX
 #define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count
-#define refresh_profile() change_profile(globals.n_profile); convert_all_frames()
+#define refresh_profile() change_profile(globals.profile_order[globals.n_profile]); convert_all_frames()
 
 #define simple(buf, n) simple_effect(current_profile.devices[n].effect, buf, frame + frames[n][TIME_DELAY], frames[n],\
 current_profile.devices[n].args, current_profile.devices[n].colors, current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
@@ -287,7 +287,7 @@ void process_uart()
                          * Do not immediately write to EEPROM if the profile being modified is the current one,
                          * instead write to the variable itself and set an update flag.
                          */
-                        if(globals.n_profile == uart_buffer[0])
+                        if(globals.profile_order[globals.n_profile] == uart_buffer[0])
                         {
                             /* Lock the buffer before reading it */
                             uart_flags |= UART_FLAG_LOCK;
@@ -421,7 +421,7 @@ void process_uart()
             {
                 if(flags & FLAG_PROFILE_UPDATED)
                 {
-                    save_profile(current_profile, globals.n_profile);
+                    save_profile(current_profile, globals.profile_order[globals.n_profile]);
                     flags &= ~FLAG_PROFILE_UPDATED;
                 }
                 uart_transmit(RECEIVE_SUCCESS);
@@ -465,7 +465,7 @@ int main(void)
             {
                 if(flags & FLAG_PROFILE_UPDATED)
                 {
-                    save_profile(current_profile, globals.n_profile);
+                    save_profile(current_profile, globals.profile_order[globals.n_profile]);
                     flags &= ~FLAG_PROFILE_UPDATED;
                 }
                 if(time < BUTTON_OFF_FRAMES && globals.leds_enabled)
