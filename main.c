@@ -19,6 +19,10 @@ extern void output_grb_fan(uint8_t *ptr, uint16_t count);
 #define FLAG_RESET (1 << 2)
 #define FLAG_PROFILE_UPDATED (1 << 3)
 
+#if (COMPILE_CSGO != 0)
+#define FLAG_CSGO_ENABLED (1 << 4)
+#endif /* (COMPILE_CSGO != 0) */
+
 volatile uint8_t flags = 0;
 //</editor-fold>
 
@@ -78,6 +82,10 @@ current_profile.devices[n].args, current_profile.devices[n].colors, current_prof
 #define digital(buf, count, offset, n) digital_effect(current_profile.devices[n].effect, buf, count, offset, frame + frames[n][TIME_DELAY], frames[n],\
 current_profile.devices[n].args, current_profile.devices[n].colors, current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
 //</editor-fold>
+
+#if (COMPILE_CSGO != 0)
+game_state csgo_state;
+#endif /* (COMPILE_CSGO != 0) */
 
 volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
 uint8_t demo = 0;
@@ -452,6 +460,29 @@ void process_uart()
                 reset_uart();
                 break;
             }
+#if (COMPILE_CSGO != 0)
+            case CSGO_BEGIN:
+            {
+                flags |= FLAG_CSGO_ENABLED;
+
+                reset_uart();
+                break;
+            }
+            case CSGO_END:
+            {
+                flags &= ~FLAG_CSGO_ENABLED;
+
+                reset_uart();
+                break;
+            }
+#else
+            case CSGO_BEGIN:
+            case CSGO_NEW_STATE:
+            case CSGO_END:
+            {
+                uart_transmit(CSGO_DISABLED);
+            }
+#endif /* (COMPILE_CSGO != 0) */
             default:
             {
                 uart_transmit(UNRECOGNIZED_COMMAND);
@@ -559,6 +590,18 @@ int main(void)
             else
             {
 #endif /* (COMPILE_DEMOS != 0) */
+
+#if (COMPILE_CSGO != 0)
+            if(flags & FLAG_CSGO_ENABLED)
+            {
+                process_csgo(frame, csgo_state, fan_buf, gpu_buf, pc_buf);
+
+                convert_bufs();
+                apply_brightness();
+            }
+            else
+            {
+#endif /* (COMPILE_CSGO != 0) */
             if(globals.leds_enabled)
             {
                 simple(pc_buf, DEVICE_PC);
@@ -583,6 +626,9 @@ int main(void)
                 set_color(pc_buf, 0, 0, 0, 0);
                 set_color(gpu_buf, 0, 0, 0, 0);
             }
+#if (COMPILE_CSGO != 0)
+            }
+#endif /* (COMPILE_CSGO != 0) */
 #if (COMPILE_DEMOS != 0)
             }
 #endif /* (COMPILE_DEMOS != 0) */
