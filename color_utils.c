@@ -199,12 +199,15 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
 
     if((d_time) < times[TIME_OFF])
     {
+        //<editor-fold desc="Off">
         color[0] = colors[n_color++] * args[ARG_BREATHE_START] / UINT8_MAX;
         color[1] = colors[n_color++] * args[ARG_BREATHE_START] / UINT8_MAX;
         color[2] = colors[n_color] * args[ARG_BREATHE_START] / UINT8_MAX;
+        //</editor-fold>
     }
     else if((d_time -= times[TIME_OFF]) < times[TIME_FADEIN])
     {
+        //<editor-fold desc="Fade in">
         uint16_t delta_brightness = args[ARG_BREATHE_END] - args[ARG_BREATHE_START];
         uint16_t progress = d_time * delta_brightness * UINT8_MAX / times[TIME_FADEIN]
                             + (args[ARG_BREATHE_START] * UINT8_MAX);
@@ -212,10 +215,11 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
         color[0] = colors[n_color++] * (uint32_t) progress / UINT16_MAX;
         color[1] = colors[n_color++] * (uint32_t) progress / UINT16_MAX;
         color[2] = colors[n_color] * (uint32_t) progress / UINT16_MAX;
-
+        //</editor-fold>
     }
     else if((d_time -= times[TIME_FADEIN]) < times[TIME_ON])
     {
+        //<editor-fold desc="On">
         if(effect == BREATHE)
         {
             color[0] = colors[n_color++] * args[ARG_BREATHE_END] / UINT8_MAX;
@@ -228,11 +232,11 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
             color[1] = colors[n_color++];
             color[2] = colors[n_color];
         }
+        //</editor-fold>
     }
     else if((d_time -= times[TIME_ON]) < times[TIME_FADEOUT])
     {
-
-
+        //<editor-fold desc="Fade out">
         if(effect == BREATHE)
         {
             uint16_t delta_brightness = args[ARG_BREATHE_END] - args[ARG_BREATHE_START];
@@ -255,6 +259,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
                 rainbow_at_progress_full(color, progress, args[ARG_RAINBOW_BRIGHTNESS]);
             }
         }
+        //</editor-fold>
     }
 }
 
@@ -300,6 +305,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
     }
     if(effect != PIECES && effect != ROTATING)
     {
+        //<editor-fold desc="FILL, FILLING_FADE, RAINBOW, ">
         uint32_t sum = times[0] + times[1] + times[2] + times[3];
         uint32_t d_time = frame % sum;
         uint8_t n_color = ((frame / sum / color_cycles) % (color_count / args[ARG_FILL_COLOR_COUNT])) *
@@ -314,6 +320,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         }
         else if((d_time -= times[TIME_OFF]) < times[TIME_FADEIN])
         {
+            //<editor-fold desc="Fade in">
             /* A 16bit replace for a float*/
             uint16_t progress = d_time * UINT16_MAX / times[TIME_FADEIN];
 
@@ -374,9 +381,11 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     }
                 }
             }
+            //</editor-fold>
         }
         else if((d_time -= times[TIME_FADEIN]) < times[TIME_ON])
         {
+            //<editor-fold desc="On">
             uint8_t piece_leds = led_count / args[ARG_FILL_PIECE_COUNT];
             int8_t piece = -1;
 
@@ -394,9 +403,11 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                 leds[index + 1] = colors[n_color_for_piece + 1];
                 leds[index + 2] = colors[n_color_for_piece + 2];
             }
+            //</editor-fold>
         }
         else if((d_time -= times[TIME_ON]) < times[TIME_FADEOUT])
         {
+            //<editor-fold desc="Fade out">
             uint16_t progress = UINT16_MAX - d_time * UINT16_MAX / times[TIME_FADEOUT];
 
             uint8_t piece_leds = led_count / args[ARG_FILL_PIECE_COUNT];
@@ -497,7 +508,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     }
                 }
             }
-
+            //</editor-fold>
         }
         if(times[TIME_ROTATION] && effect != RAINBOW)
         {
@@ -523,9 +534,11 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     rainbow_at_progress(leds + alt_index, d_progress, args[ARG_RAINBOW_BRIGHTNESS]);
             }
         }
+        //</editor-fold>
     }
     else
     {
+        //<editor-fold desc="PIECES, ROTATING">
         uint16_t sum = times[TIME_ON] + times[TIME_FADEOUT];
         uint32_t d_time = frame % sum;
         uint8_t c_count = effect == ROTATING ? led_count : args[ARG_PIECES_COLOR_COUNT];
@@ -603,6 +616,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         uint16_t piece_leds = (effect == ROTATING ? 1 : led_count / args[ARG_PIECES_PIECE_COUNT]) * UINT8_MAX;
 
         rotate_buf(leds, led_count, rotation_progress, start_led, piece_leds, args[ARG_BIT_PACK], c_colors, c_count);
+        //</editor-fold>
     }
 }
 

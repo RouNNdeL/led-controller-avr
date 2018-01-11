@@ -274,6 +274,7 @@ void process_uart()
         {
             case SAVE_PROFILE:
             {
+                //<editor-fold desc="Save profile">
                 if(!(uart_flags & UART_FLAG_RECEIVE))
                 {
                     uart_transmit(READY_TO_RECEIVE);
@@ -319,10 +320,12 @@ void process_uart()
 
                     reset_uart();
                 }
+                //</editor-fold>
                 break;
             }
             case SAVE_GLOBALS:
             {
+                //<editor-fold desc="Save globals">
                 if(!(uart_flags & UART_FLAG_RECEIVE))
                 {
                     uart_transmit(READY_TO_RECEIVE);
@@ -332,13 +335,15 @@ void process_uart()
                 {
                     /* Lock the buffer before reading it */
                     uint8_t previous_profile = globals.n_profile;
+                    uint8_t previous_profile_index = globals.profile_order[globals.n_profile];
                     uint8_t previous_enabled = globals.leds_enabled;
                     uart_flags |= UART_FLAG_LOCK;
                     memcpy(&globals, (const void *) (uart_buffer), GLOBALS_LENGTH);
                     uart_flags &= ~UART_FLAG_LOCK;
 
                     save_globals();
-                    if(previous_profile != globals.n_profile || previous_enabled != globals.leds_enabled)
+                    if(previous_profile != globals.n_profile || previous_enabled != globals.leds_enabled
+                       || previous_profile_index != globals.profile_order[globals.n_profile])
                     {
                         refresh_profile();
                         frame = 0;
@@ -349,6 +354,7 @@ void process_uart()
 
                     reset_uart();
                 }
+                //</editor-fold>
                 break;
             }
             case SEND_PROFILE:
@@ -385,6 +391,7 @@ void process_uart()
             }
             case TEMP_DEVICE:
             {
+                //<editor-fold desc="Temporary device (for Google Assistant)">
                 if(!(uart_flags & UART_FLAG_RECEIVE))
                 {
                     uart_transmit(READY_TO_RECEIVE);
@@ -404,6 +411,7 @@ void process_uart()
                     reset_uart();
                 }
                 break;
+                //</editor-fold>
             }
             case START_DEMO_MUSIC:
             case START_DEMO_EFFECTS:
@@ -453,6 +461,7 @@ int main(void)
 
     while(1)
     {
+        //<editor-fold desc="Buttons">
         if((PINA & PIN_BUTTON) && !(flags & FLAG_BUTTON))
         {
             button_frame = frame;
@@ -494,6 +503,7 @@ int main(void)
             button_frame = 0;
             flags &= ~FLAG_BUTTON;
         }
+        //</editor-fold>
 
         process_uart();
 
