@@ -48,6 +48,7 @@
 #define TIME_ROTATION 4
 #define TIME_DELAY 5
 
+#define rgb(r, g, b) r, g, b
 
 typedef enum
 {
@@ -64,6 +65,8 @@ typedef enum
 void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t count);
 
 void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b);
+
+void cross_fade(uint8_t *color, uint8_t *colors, uint8_t n_color, uint8_t m_color, uint16_t progress);
 
 void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, uint8_t start_led, uint16_t piece_leds,
                 uint8_t bit_pack, uint8_t *colors, uint8_t color_count);

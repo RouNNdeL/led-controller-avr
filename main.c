@@ -594,7 +594,8 @@ int main(void)
 #if (COMPILE_CSGO != 0)
             if(flags & FLAG_CSGO_ENABLED)
             {
-                process_csgo(frame, csgo_state, fan_buf, gpu_buf, pc_buf);
+                //csgo_state.ammo = 255 - (frame % UINT8_MAX);
+                process_csgo(frame, csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf);
 
                 convert_bufs();
                 apply_brightness();
