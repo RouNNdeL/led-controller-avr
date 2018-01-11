@@ -7,19 +7,28 @@
 #include "eeprom.h"
 #include "uart.h"
 #include "config.h"
-
-#define FLAG_BUTTON (1 << 0)
-#define FLAG_RESET (1 << 1)
-#define FLAG_PROFILE_UPDATED (1 << 2)
-uint8_t flags = 0;
-
-#define PIN_RESET (1 << PD2)
-#define PIN_BUTTON (1 << PA4)
-#define PIN_LED (1 << PA3)
+#include "csgo.h"
 
 extern void output_grb_strip(uint8_t *ptr, uint16_t count);
 
 extern void output_grb_fan(uint8_t *ptr, uint16_t count);
+
+//<editor-fold desc="Flags">
+#define FLAG_NEW_FRAME (1 << 0)
+#define FLAG_BUTTON (1 << 1)
+#define FLAG_RESET (1 << 2)
+#define FLAG_PROFILE_UPDATED (1 << 3)
+
+volatile uint8_t flags = 0;
+//</editor-fold>
+
+//<editor-fold desc="IO">
+#define PIN_RESET (1 << PD2)
+#define PIN_BUTTON (1 << PA4)
+#define PIN_LED (1 << PA3)
+//</editor-fold>
+
+//<editor-fold desc="Data">
 
 profile EEMEM profiles[PROFILE_COUNT];
 global_settings EEMEM globals_addr;
@@ -28,6 +37,19 @@ global_settings globals;
 profile current_profile;
 uint16_t frames[6][6];
 uint16_t auto_increment;
+
+#define fetch_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH)
+#define change_profile(n) eeprom_read_block(&current_profile, &profiles[n], PROFILE_LENGTH)
+#define save_profile(p, n) eeprom_update_block(&p, &profiles[n], PROFILE_LENGTH)
+#define save_globals() eeprom_update_block(&globals, &globals_addr, GLOBALS_LENGTH)
+
+#define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count
+#define refresh_profile() change_profile(globals.profile_order[globals.n_profile]); convert_all_frames()
+
+#define brightness(color) (color * globals.brightness) / UINT8_MAX
+//</editor-fold>
+
+//<editor-fold desc="Uart">
 
 volatile uint8_t uart_control = 0x00;
 volatile uint8_t uart_buffer[64];
@@ -38,34 +60,27 @@ volatile uint8_t uart_buffer_length = 0;
 uint8_t uart_flags = 0;
 
 #define reset_uart() uart_buffer_length = 0;uart_flags &= ~UART_FLAG_RECEIVE;uart_control = 0x00
+//</editor-fold>
+
+//<editor-fold desc="Hardware">
 
 uint8_t fan_buf[FAN_LED_COUNT * MAX_FAN_COUNT * 3];
 uint8_t strip_buf[(STRIP_LED_COUNT + 1) * 3];
 uint8_t pc_buf[3];
 uint8_t gpu_buf[3];
 
-volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
-volatile uint8_t new_frame = 1;
-
-uint8_t demo = 0;
-
-#define fetch_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH)
-#define change_profile(n) eeprom_read_block(&current_profile, &profiles[n], PROFILE_LENGTH)
-#define save_profile(p, n) eeprom_update_block(&p, &profiles[n], PROFILE_LENGTH)
-#define save_globals() eeprom_update_block(&globals, &globals_addr, GLOBALS_LENGTH)
-
 #define output_pc(color) output_analog1(color[0], color[1], color[2])
 #define output_gpu(color) output_analog2(color[2], color[1], color[0])
-
-#define brightness(color) (color * globals.brightness) / UINT8_MAX
-#define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count
-#define refresh_profile() change_profile(globals.profile_order[globals.n_profile]); convert_all_frames()
 
 #define simple(buf, n) simple_effect(current_profile.devices[n].effect, buf, frame + frames[n][TIME_DELAY], frames[n],\
 current_profile.devices[n].args, current_profile.devices[n].colors, current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
 
 #define digital(buf, count, offset, n) digital_effect(current_profile.devices[n].effect, buf, count, offset, frame + frames[n][TIME_DELAY], frames[n],\
 current_profile.devices[n].args, current_profile.devices[n].colors, current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
+//</editor-fold>
+
+volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
+uint8_t demo = 0;
 
 void convert_bufs()
 {
@@ -413,8 +428,8 @@ void process_uart()
                 break;
                 //</editor-fold>
             }
-            case START_DEMO_MUSIC:
-            case START_DEMO_EFFECTS:
+            case DEMO_START_MUSIC:
+            case DEMO_START_EFFECTS:
             {
 #if (COMPILE_DEMOS != 0)
                 demo = uart_control;
@@ -507,9 +522,9 @@ int main(void)
 
         process_uart();
 
-        if(new_frame)
+        if(flags & FLAG_NEW_FRAME)
         {
-            new_frame = 0;
+            flags &= ~FLAG_NEW_FRAME;
             if(auto_increment && frame && frame % auto_increment == 0 && globals.leds_enabled)
             {
                 increment_profile();
@@ -524,10 +539,10 @@ int main(void)
                 uint8_t demo_finished = 1;
                 switch(demo)
                 {
-                    case START_DEMO_MUSIC:
+                    case DEMO_START_MUSIC:
                         demo_finished = demo_music(fan_buf, pc_buf, gpu_buf, frame);
                         break;
-                    case START_DEMO_EFFECTS:
+                    case DEMO_START_EFFECTS:
                         demo_finished = demo_effects(fan_buf, pc_buf, gpu_buf, frame);
                         break;
                 }
@@ -538,7 +553,7 @@ int main(void)
                 {
                     demo = 0;
                     frame = 0;
-                    uart_transmit(END_DEMO);
+                    uart_transmit(DEMO_END);
                 }
             }
             else
@@ -587,7 +602,7 @@ int main(void)
 ISR(TIMER3_COMPA_vect)
 {
     frame++;
-    new_frame = 1;
+    flags |= FLAG_NEW_FRAME;
     update();
 }
 
