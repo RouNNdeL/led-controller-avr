@@ -464,6 +464,7 @@ void process_uart()
             case CSGO_BEGIN:
             {
                 flags |= FLAG_CSGO_ENABLED;
+                uart_transmit(RECEIVE_SUCCESS);
 
                 reset_uart();
                 break;
@@ -471,8 +472,28 @@ void process_uart()
             case CSGO_END:
             {
                 flags &= ~FLAG_CSGO_ENABLED;
+                uart_transmit(RECEIVE_SUCCESS);
 
                 reset_uart();
+                break;
+            }
+            case CSGO_NEW_STATE:
+            {
+                if(!(uart_flags & UART_FLAG_RECEIVE))
+                {
+                    uart_transmit(READY_TO_RECEIVE);
+                    uart_flags |= UART_FLAG_RECEIVE;
+                }
+                else if(uart_buffer_length >= CSGO_STATE_LENGTH)
+                {
+                    uart_flags |= UART_FLAG_LOCK;
+                    memcpy(&csgo_state, (const void *) (uart_buffer), CSGO_STATE_LENGTH);
+                    uart_flags &= ~UART_FLAG_LOCK;
+
+                    uart_transmit(RECEIVE_SUCCESS);
+
+                    reset_uart();
+                }
                 break;
             }
 #else

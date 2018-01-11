@@ -54,5 +54,8 @@ void process_csgo(uint32_t frame, game_state state, uint8_t* fan, uint8_t fan_st
             fan[index + 2] = 0x00;
         }
     }
+
+    set_all_colors(pc, 0, rgb(0,0,0));
+    set_all_colors(gpu, 0, rgb(0,0,0));
     //</editor-fold>
 }
