@@ -84,7 +84,9 @@ current_profile.devices[n].args, current_profile.devices[n].colors, current_prof
 //</editor-fold>
 
 #if (COMPILE_CSGO != 0)
-game_state csgo_state;
+game_state csgo_state = {0, 0, 0};
+game_state old_csgo_state = {0, 0, 0};
+control_frames csgo_frames;
 #endif /* (COMPILE_CSGO != 0) */
 
 volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
@@ -486,9 +488,13 @@ void process_uart()
                 }
                 else if(uart_buffer_length >= CSGO_STATE_LENGTH)
                 {
+                    old_csgo_state = csgo_state;
+
                     uart_flags |= UART_FLAG_LOCK;
                     memcpy(&csgo_state, (const void *) (uart_buffer), CSGO_STATE_LENGTH);
                     uart_flags &= ~UART_FLAG_LOCK;
+
+                    csgo_frames.ammo_frame = 0;
 
                     uart_transmit(RECEIVE_SUCCESS);
 
@@ -616,7 +622,8 @@ int main(void)
             if(flags & FLAG_CSGO_ENABLED)
             {
                 //csgo_state.ammo = 255 - (frame % UINT8_MAX);
-                process_csgo(frame, csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf);
+                process_csgo(csgo_frames, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf);
+                csgo_frames.ammo_frame += 1;
 
                 convert_bufs();
                 apply_brightness();
