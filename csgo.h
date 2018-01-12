@@ -9,6 +9,12 @@
 #define AMMO_FADE_END 25
 #define AMMO_TRANSITION_TIME 10 /* in frames*/
 
+#define HEALTH_COLOR_HIGH rgb(0, 255, 0)
+#define HEALTH_COLOR_MEDIUM rgb(255, 255, 0)
+#define HEALTH_COLOR_LOW rgb(255, 0, 0)
+#define HEALTH_MEDIUM_HEALTH 128
+#define HEALTH_TRANSITION_TIME 16 /* in frames*/
+
 typedef struct
 {
     uint8_t health;
@@ -20,6 +26,7 @@ typedef struct
 typedef struct
 {
     uint8_t ammo_frame;
+    uint8_t health_frame;
 } control_frames;
 
 
