@@ -5,7 +5,7 @@
 
 #define AMMO_COLOR_NORMAL rgb(255, 180, 0)
 #define AMMO_COLOR_LOW rgb(255, 0, 0)
-#define AMMO_COLOR_NO_AMMO rgb(155, 226, 255)
+#define AMMO_COLOR_NO_AMMO rgb(122, 213, 255)
 #define AMMO_FADE_START 51 /* When to start fade from COLOR_NORMAL to COLOR_LOW */
 #define AMMO_FADE_END 25
 #define AMMO_TRANSITION_TIME 10 /* in frames*/
@@ -22,7 +22,8 @@
 #define HEALTH_TRANSITION_TIME 16 /* in frames*/
 
 #define FLASH_COLOR COLOR_WHITE
-#define FLASH_TRANSITION_TIME 8
+#define FLASH_TRANSITION_TIME_UP 4
+#define FLASH_TRANSITION_TIME_DOWN 8
 
 typedef struct
 {

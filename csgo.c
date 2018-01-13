@@ -105,12 +105,14 @@ void process_csgo(control_frames *frames, game_state *state, game_state *old_sta
 
     //<editor-fold desc="Flash">
     uint8_t transition_flash =
-            old_state->flashed - (old_state->flashed - state->flashed) * frames->flash_frame / FLASH_TRANSITION_TIME;
+            old_state->flashed - (old_state->flashed - state->flashed) * frames->flash_frame /
+                                 (old_state->flashed > state->flashed ? FLASH_TRANSITION_TIME_DOWN
+                                                                      : FLASH_TRANSITION_TIME_UP);
     uint16_t transition_progress = transition_flash * UINT8_MAX;
 
     uint8_t pc_base[6] = {pc[0], pc[1], pc[2], FLASH_COLOR};
     cross_fade(pc, pc_base, 0, 3, transition_progress);
-    
+
     uint8_t fan_cpy[FAN_LED_COUNT * 3 + 3];
     memcpy(fan_cpy, fan, FAN_LED_COUNT * 3);
     fan_cpy[FAN_LED_COUNT * 3] = pc_base[3];
@@ -140,7 +142,7 @@ void process_csgo(control_frames *frames, game_state *state, game_state *old_sta
     {
         old_state->health = state->health;
     }
-    if(frames->flash_frame >= FLASH_TRANSITION_TIME)
+    if(frames->flash_frame >= (old_state->flashed > state->flashed ? FLASH_TRANSITION_TIME_DOWN : FLASH_TRANSITION_TIME_UP))
     {
         old_state->flashed = state->flashed;
     }
