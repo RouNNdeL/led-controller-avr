@@ -125,7 +125,7 @@ void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, ui
     for(uint8_t j = 0; j < led_count; ++j)
     {
         //TODO: Add direction argument support
-        uint8_t index = (j + led_offset + start_led) % led_count * 3;
+        uint8_t index = ( led_count + j + led_offset - start_led) % led_count * 3;
 
         /* If we're at the first LED of a certain color and led_carry != 0 crossfade with the previous color */
         if(current_leds == 0 && led_carry && (bit_pack & SMOOTH))
