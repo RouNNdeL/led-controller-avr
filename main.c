@@ -496,6 +496,7 @@ void process_uart()
 
                     csgo_frames.ammo_frame = 0;
                     csgo_frames.health_frame = 0;
+                    csgo_frames.bomb_tick = 0;
 
                     uart_transmit(RECEIVE_SUCCESS);
 
@@ -623,9 +624,10 @@ int main(void)
             if(flags & FLAG_CSGO_ENABLED)
             {
                 //csgo_state.ammo = 255 - (frame % UINT8_MAX);
-                process_csgo(csgo_frames, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf);
+                process_csgo(&csgo_frames, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf);
                 csgo_frames.ammo_frame += 1;
                 csgo_frames.health_frame += 1;
+                csgo_frames.bomb_tick += 1;
 
                 convert_bufs();
                 apply_brightness();

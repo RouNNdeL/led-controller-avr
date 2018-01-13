@@ -50,6 +50,15 @@
 
 #define rgb(r, g, b) r, g, b
 
+#define COLOR_BLACK rgb(0, 0, 0)
+#define COLOR_WHITE rgb(255, 255, 255)
+#define COLOR_RED rgb(255, 0, 0)
+#define COLOR_GREEN rgb(0, 255, 0)
+#define COLOR_BLUE rgb(0, 0, 255)
+#define COLOR_YELLOW rgb(255, 255, 0)
+#define COLOR_MAGENTA rgb(255, 0, 255)
+#define COLOR_CYAN rgb(0, 255, 255)
+
 typedef enum
 {
     BREATHE = 0x00,
