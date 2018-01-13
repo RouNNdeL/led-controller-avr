@@ -10,7 +10,7 @@
 #define AMMO_FADE_END 25
 #define AMMO_TRANSITION_TIME 10 /* in frames*/
 
-#define BOMB_SLOT_COLOR rgb(255, 30, 0)
+#define BOMB_SLOT_COLOR rgb(255, 25, 25)
 #define BOMB_ANIMATION_TIME 64 /* in frames */
 #define BOMB_ANIMATION_LOW 150 /* in frames */
 #define BOMB_ANIMATION_HIGH 255 /* in frames */
@@ -21,9 +21,13 @@
 #define HEALTH_MEDIUM_HEALTH 128
 #define HEALTH_TRANSITION_TIME 16 /* in frames*/
 
+#define FLASH_COLOR COLOR_WHITE
+#define FLASH_TRANSITION_TIME 8
+
 typedef struct
 {
     uint8_t health;
+    uint8_t flashed;
     uint8_t ammo;
     uint8_t weapon_slot;
     uint8_t bomb_progress;
@@ -33,6 +37,7 @@ typedef struct
 typedef struct
 {
     uint8_t ammo_frame;
+    uint8_t flash_frame;
     uint8_t health_frame;
     uint8_t bomb_tick;
 } control_frames;

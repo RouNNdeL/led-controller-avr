@@ -1,3 +1,4 @@
+#include <string.h>
 #include "csgo.h"
 #include "color_utils.h"
 #include "eeprom.h"
@@ -80,6 +81,7 @@ void process_csgo(control_frames *frames, game_state *state, game_state *old_sta
     }
     //</editor-fold>
 
+    //<editor-fold desc="Health on PC">
     uint8_t transition_health =
             old_state->health - (old_state->health - state->health) * frames->health_frame / HEALTH_TRANSITION_TIME;
 
@@ -97,8 +99,29 @@ void process_csgo(control_frames *frames, game_state *state, game_state *old_sta
     {
         cross_fade(pc, health_colors, 6, 3, transition_health * (uint32_t) UINT16_MAX / HEALTH_MEDIUM_HEALTH);
     }
+    //</editor-fold>
 
     set_color(gpu, 0, rgb(0, 0, 0));
+
+    //<editor-fold desc="Flash">
+    uint8_t transition_flash =
+            old_state->flashed - (old_state->flashed - state->flashed) * frames->flash_frame / FLASH_TRANSITION_TIME;
+    uint16_t transition_progress = transition_flash * UINT8_MAX;
+
+    uint8_t pc_base[6] = {pc[0], pc[1], pc[2], FLASH_COLOR};
+    cross_fade(pc, pc_base, 0, 3, transition_progress);
+    
+    uint8_t fan_cpy[FAN_LED_COUNT * 3 + 3];
+    memcpy(fan_cpy, fan, FAN_LED_COUNT * 3);
+    fan_cpy[FAN_LED_COUNT * 3] = pc_base[3];
+    fan_cpy[FAN_LED_COUNT * 3 + 1] = pc_base[4];
+    fan_cpy[FAN_LED_COUNT * 3 + 2] = pc_base[5];
+
+    for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
+    {
+        cross_fade(fan + i * 3, fan_cpy, i * 3, FAN_LED_COUNT * 3, transition_progress);
+    }
+    //</editor-fold>
 
     if(frames->bomb_tick >= BOMB_ANIMATION_TIME)
     {
@@ -116,5 +139,9 @@ void process_csgo(control_frames *frames, game_state *state, game_state *old_sta
     if(frames->health_frame >= HEALTH_TRANSITION_TIME)
     {
         old_state->health = state->health;
+    }
+    if(frames->flash_frame >= FLASH_TRANSITION_TIME)
+    {
+        old_state->flashed = state->flashed;
     }
 }

@@ -497,6 +497,7 @@ void process_uart()
                     csgo_frames.ammo_frame = 0;
                     csgo_frames.health_frame = 0;
                     csgo_frames.bomb_tick = 0;
+                    csgo_frames.flash_frame = 0;
 
                     uart_transmit(RECEIVE_SUCCESS);
 
@@ -628,6 +629,7 @@ int main(void)
                 csgo_frames.ammo_frame += 1;
                 csgo_frames.health_frame += 1;
                 csgo_frames.bomb_tick += 1;
+                csgo_frames.flash_frame += 1;
 
                 convert_bufs();
                 apply_brightness();
