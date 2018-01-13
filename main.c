@@ -588,6 +588,11 @@ int main(void)
             flags &= ~FLAG_NEW_FRAME;
             if(auto_increment && frame && frame % auto_increment == 0 && globals.leds_enabled)
             {
+                if(flags & FLAG_PROFILE_UPDATED)
+                {
+                    save_profile(current_profile, globals.profile_order[globals.n_profile]);
+                    flags &= ~FLAG_PROFILE_UPDATED;
+                }
                 increment_profile();
                 refresh_profile();
                 uart_transmit(GLOBALS_UPDATED);
