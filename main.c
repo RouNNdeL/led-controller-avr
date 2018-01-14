@@ -508,6 +508,11 @@ void process_uart()
                     csgo_ctrl.damage += (old_csgo_state.health > csgo_state.health ?
                                          old_csgo_state.health - csgo_state.health : 0);
 
+                    if(csgo_state.health == 0)
+                    {
+                        csgo_ctrl.damage = csgo_ctrl.damage > DAMAGE_MIN_ON_DEATH ? csgo_ctrl.damage : DAMAGE_MIN_ON_DEATH;
+                    }
+
                     csgo_ctrl.ammo_frame = 0;
                     csgo_ctrl.health_frame = 0;
                     csgo_ctrl.bomb_tick_frame = 0;

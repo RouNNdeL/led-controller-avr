@@ -90,6 +90,17 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
     set_color(health_colors, 1, HEALTH_COLOR_MEDIUM);
     set_color(health_colors, 2, HEALTH_COLOR_LOW);
 
+    //Transition to damage color to then smoothly fade out with the GPU
+    if(!state->health)
+    {
+        uint8_t damage_multiplied = control->damage * (uint16_t) DAMAGE_BRIGHTNESS_MULTIPLIER < UINT8_MAX ?
+                                    control->damage * DAMAGE_BRIGHTNESS_MULTIPLIER : UINT8_MAX;
+        uint8_t color[] = {DAMAGE_COLOR};
+        health_colors[6] = color[0] * damage_multiplied / UINT8_MAX;
+        health_colors[7] = color[1] * damage_multiplied / UINT8_MAX;
+        health_colors[8] = color[2] * damage_multiplied / UINT8_MAX;
+    }
+
     if(transition_health > HEALTH_MEDIUM_HEALTH)
     {
         cross_fade(pc, health_colors, 3, 0,
@@ -131,6 +142,8 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
             uint8_t args[] = {0, 0, damage_multiplied};
             uint8_t color[] = {DAMAGE_COLOR};
             simple_effect(BREATHE, gpu, control->damage_frame, times, args, color, 1, 1);
+            if(!state->health)
+                memcpy(pc, gpu, 3);
         }
         else
         {
@@ -148,6 +161,9 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
                 gpu[0] = color[0] * damage_transition / UINT8_MAX;
                 gpu[1] = color[1] * damage_transition / UINT8_MAX;
                 gpu[2] = color[2] * damage_transition / UINT8_MAX;
+
+                if(!state->health)
+                    memcpy(pc, gpu, 3);
             }
             else
             {
@@ -161,7 +177,11 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
     else
     {
         set_color(gpu, 0, COLOR_BLACK);
+        if(!state->health)
+            set_color(pc, 0, COLOR_BLACK);
     }
+
+
     //</editor-fold>
 
     //<editor-fold desc="Flash">
