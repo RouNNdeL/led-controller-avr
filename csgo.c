@@ -3,7 +3,7 @@
 #include "color_utils.h"
 #include "eeprom.h"
 
-void process_csgo(control_frames *frames, game_state *state, game_state *old_state, uint8_t *fan, uint8_t fan_start_led,
+void process_csgo(csgo_control *control, game_state *state, game_state *old_state, uint8_t *fan, uint8_t fan_start_led,
                   uint8_t *gpu, uint8_t *pc)
 {
     //<editor-fold desc="Ammunition on CPU fan">
@@ -12,7 +12,7 @@ void process_csgo(control_frames *frames, game_state *state, game_state *old_sta
     {
         //<editor-fold desc="1, 2 slot">
         uint8_t transition_ammo =
-                old_state->ammo - (old_state->ammo - state->ammo) * frames->ammo_frame / AMMO_TRANSITION_TIME;
+                old_state->ammo - (old_state->ammo - state->ammo) * control->ammo_frame / AMMO_TRANSITION_TIME;
         uint8_t ammo_color[3];
         if(transition_ammo >= AMMO_FADE_START)
         {
@@ -69,7 +69,7 @@ void process_csgo(control_frames *frames, game_state *state, game_state *old_sta
         uint16_t times[] = {0, BOMB_ANIMATION_TIME / 2, 0, BOMB_ANIMATION_TIME / 2, 0, 0};
         uint8_t args[] = {0, BOMB_ANIMATION_LOW, BOMB_ANIMATION_HIGH};
         uint8_t colors[] = {BOMB_SLOT_COLOR};
-        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, frames->bomb_tick, times, args, colors, 1, 1);
+        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->bomb_tick_frame, times, args, colors, 1, 1);
     }
     else if(state->weapon_slot)
     {
@@ -83,7 +83,7 @@ void process_csgo(control_frames *frames, game_state *state, game_state *old_sta
 
     //<editor-fold desc="Health on PC">
     uint8_t transition_health =
-            old_state->health - (old_state->health - state->health) * frames->health_frame / HEALTH_TRANSITION_TIME;
+            old_state->health - (old_state->health - state->health) * control->health_frame / HEALTH_TRANSITION_TIME;
 
     uint8_t health_colors[9];
     set_color(health_colors, 0, HEALTH_COLOR_HIGH);
@@ -101,23 +101,84 @@ void process_csgo(control_frames *frames, game_state *state, game_state *old_sta
     }
     //</editor-fold>
 
-    set_color(gpu, 0, rgb(0, 0, 0));
+    //<editor-fold desc="Damage on GPU">
+
+    if(control->damage)
+    {
+        if(!control->damage_animate && control->damage_buffer_frame >= DAMAGE_BUFFER_TIME &&
+           control->damage_transition_frame >= DAMAGE_TRANSITION_TIME)
+        {
+            control->damage_animate = 1;
+            control->damage_frame = 0;
+        }
+        if(control->damage_animate &&
+           control->damage_frame >= control->damage * (uint16_t) DAMAGE_ANIMATION_TIME / UINT8_MAX)
+        {
+            control->damage_animate = 0;
+            control->damage = 0;
+            control->damage_previous = 0;
+        }
+    }
+
+    if(control->damage)
+    {
+        uint8_t damage_multiplied = control->damage * (uint16_t) DAMAGE_BRIGHTNESS_MULTIPLIER < UINT8_MAX ?
+                                    control->damage * DAMAGE_BRIGHTNESS_MULTIPLIER : UINT8_MAX;
+
+        if(control->damage_animate)
+        {
+            uint16_t times[] = {0, 0, 0, control->damage * (uint16_t) DAMAGE_ANIMATION_TIME / UINT8_MAX};
+            uint8_t args[] = {0, 0, damage_multiplied};
+            uint8_t color[] = {DAMAGE_COLOR};
+            simple_effect(BREATHE, gpu, control->damage_frame, times, args, color, 1, 1);
+        }
+        else
+        {
+            if(control->damage_frame + 1 >= DAMAGE_ANIMATION_START)
+            {
+                uint8_t color[] = {DAMAGE_COLOR};
+                uint8_t damage_multiplied_previous =
+                        control->damage_previous * (uint16_t) DAMAGE_BRIGHTNESS_MULTIPLIER < UINT8_MAX ?
+                        control->damage_previous * DAMAGE_BRIGHTNESS_MULTIPLIER : UINT8_MAX;
+                uint8_t damage_transition = damage_multiplied_previous ?
+                                            damage_multiplied_previous +
+                                            (damage_multiplied - damage_multiplied_previous) *
+                                            control->damage_transition_frame / DAMAGE_TRANSITION_TIME
+                                                                       : damage_multiplied;
+                gpu[0] = color[0] * damage_transition / UINT8_MAX;
+                gpu[1] = color[1] * damage_transition / UINT8_MAX;
+                gpu[2] = color[2] * damage_transition / UINT8_MAX;
+            }
+            else
+            {
+                uint16_t times[] = {0, DAMAGE_ANIMATION_START};
+                uint8_t args[] = {0, 0, damage_multiplied};
+                uint8_t color[] = {DAMAGE_COLOR};
+                simple_effect(BREATHE, gpu, control->damage_frame, times, args, color, 1, 1);
+            }
+        }
+    }
+    else
+    {
+        set_color(gpu, 0, COLOR_BLACK);
+    }
+    //</editor-fold>
 
     //<editor-fold desc="Flash">
-    uint8_t transition_flash =
-            old_state->flashed - (old_state->flashed - state->flashed) * frames->flash_frame /
-                                 (old_state->flashed > state->flashed ? FLASH_TRANSITION_TIME_DOWN
-                                                                      : FLASH_TRANSITION_TIME_UP);
+    uint8_t transition_flash = old_state->flashed - (old_state->flashed - state->flashed) * control->flash_frame /
+                                                    (old_state->flashed > state->flashed ? FLASH_TRANSITION_TIME_DOWN
+                                                                                         : FLASH_TRANSITION_TIME_UP);
     uint16_t transition_progress = transition_flash * UINT8_MAX;
 
-    uint8_t pc_base[6] = {pc[0], pc[1], pc[2], FLASH_COLOR};
-    cross_fade(pc, pc_base, 0, 3, transition_progress);
+    uint8_t analog_base[9] = {pc[0], pc[1], pc[2], gpu[0], gpu[1], gpu[2], FLASH_COLOR};
+    cross_fade(pc, analog_base, 0, 6, transition_progress);
+    cross_fade(gpu, analog_base, 3, 6, transition_progress);
 
     uint8_t fan_cpy[FAN_LED_COUNT * 3 + 3];
     memcpy(fan_cpy, fan, FAN_LED_COUNT * 3);
-    fan_cpy[FAN_LED_COUNT * 3] = pc_base[3];
-    fan_cpy[FAN_LED_COUNT * 3 + 1] = pc_base[4];
-    fan_cpy[FAN_LED_COUNT * 3 + 2] = pc_base[5];
+    fan_cpy[FAN_LED_COUNT * 3] = analog_base[6];
+    fan_cpy[FAN_LED_COUNT * 3 + 1] = analog_base[7];
+    fan_cpy[FAN_LED_COUNT * 3 + 2] = analog_base[8];
 
     for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
     {
@@ -125,25 +186,32 @@ void process_csgo(control_frames *frames, game_state *state, game_state *old_sta
     }
     //</editor-fold>
 
-    if(frames->bomb_tick >= BOMB_ANIMATION_TIME)
+    //<editor-fold desc="Variable resets">
+    if(control->bomb_tick_frame >= BOMB_ANIMATION_TIME)
     {
-        frames->bomb_tick = 0;
+        control->bomb_tick_frame = 0;
     }
     if(state->weapon_slot != old_state->weapon_slot)
     {
         old_state->ammo = state->ammo;
         old_state->weapon_slot = state->weapon_slot;
     }
-    if((state->weapon_slot != 1 && state->weapon_slot != 2) || frames->ammo_frame >= AMMO_TRANSITION_TIME)
+    if((state->weapon_slot != 1 && state->weapon_slot != 2) || control->ammo_frame >= AMMO_TRANSITION_TIME)
     {
         old_state->ammo = state->ammo;
     }
-    if(frames->health_frame >= HEALTH_TRANSITION_TIME)
+    if(control->health_frame >= HEALTH_TRANSITION_TIME)
     {
         old_state->health = state->health;
     }
-    if(frames->flash_frame >= (old_state->flashed > state->flashed ? FLASH_TRANSITION_TIME_DOWN : FLASH_TRANSITION_TIME_UP))
+    if(control->flash_frame >=
+       (old_state->flashed > state->flashed ? FLASH_TRANSITION_TIME_DOWN : FLASH_TRANSITION_TIME_UP))
     {
         old_state->flashed = state->flashed;
     }
+    if(control->damage_transition_frame >= DAMAGE_TRANSITION_TIME)
+    {
+        control->damage_previous = control->damage;
+    }
+    //</editor-fold>
 }

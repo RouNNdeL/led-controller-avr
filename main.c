@@ -72,6 +72,7 @@ uint8_t fan_buf[FAN_LED_COUNT * MAX_FAN_COUNT * 3];
 uint8_t strip_buf[(STRIP_LED_COUNT + 1) * 3];
 uint8_t pc_buf[3];
 uint8_t gpu_buf[3];
+uint8_t gpu_buf_cpy[3];
 
 #define output_pc(color) output_analog1(color[0], color[1], color[2])
 #define output_gpu(color) output_analog2(color[2], color[1], color[0])
@@ -84,9 +85,9 @@ current_profile.devices[n].args, current_profile.devices[n].colors, current_prof
 //</editor-fold>
 
 #if (COMPILE_CSGO != 0)
-game_state csgo_state = {0, 0, 0};
-game_state old_csgo_state = {0, 0, 0};
-control_frames csgo_frames;
+game_state csgo_state = {0, 0, 0, 0, 0};
+game_state old_csgo_state = {0, 0, 0, 0, 0};
+csgo_control csgo_ctrl = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 #endif /* (COMPILE_CSGO != 0) */
 
 volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
@@ -494,10 +495,24 @@ void process_uart()
                     memcpy(&csgo_state, (const void *) (uart_buffer), CSGO_STATE_LENGTH);
                     uart_flags &= ~UART_FLAG_LOCK;
 
-                    csgo_frames.ammo_frame = 0;
-                    csgo_frames.health_frame = 0;
-                    csgo_frames.bomb_tick = 0;
-                    csgo_frames.flash_frame = 0;
+                    if(!csgo_ctrl.damage && old_csgo_state.health > csgo_state.health)
+                    {
+                        csgo_ctrl.damage_frame = 0;
+                    }
+                    if(old_csgo_state.health > csgo_state.health)
+                    {
+                        csgo_ctrl.damage_buffer_frame = 0;
+                    }
+
+                    csgo_ctrl.damage_previous = csgo_ctrl.damage;
+                    csgo_ctrl.damage += (old_csgo_state.health > csgo_state.health ?
+                                         old_csgo_state.health - csgo_state.health : 0);
+
+                    csgo_ctrl.ammo_frame = 0;
+                    csgo_ctrl.health_frame = 0;
+                    csgo_ctrl.bomb_tick_frame = 0;
+                    csgo_ctrl.flash_frame = 0;
+                    csgo_ctrl.damage_transition_frame = 0;
 
                     uart_transmit(RECEIVE_SUCCESS);
 
@@ -630,11 +645,9 @@ int main(void)
             if(flags & FLAG_CSGO_ENABLED)
             {
                 //csgo_state.ammo = 255 - (frame % UINT8_MAX);
-                process_csgo(&csgo_frames, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf);
-                csgo_frames.ammo_frame += 1;
-                csgo_frames.health_frame += 1;
-                csgo_frames.bomb_tick += 1;
-                csgo_frames.flash_frame += 1;
+                process_csgo(&csgo_ctrl, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf);
+
+                csgo_increment_frames();
 
                 convert_bufs();
                 apply_brightness();
@@ -642,30 +655,30 @@ int main(void)
             else
             {
 #endif /* (COMPILE_CSGO != 0) */
-            if(globals.leds_enabled)
-            {
-                simple(pc_buf, DEVICE_PC);
-                simple(gpu_buf, DEVICE_GPU);
-
-                for(uint8_t i = 0; i < globals.fan_count; ++i)
+                if(globals.leds_enabled)
                 {
-                    digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN+i);
+                    simple(pc_buf, DEVICE_PC);
+                    simple(gpu_buf, DEVICE_GPU);
+
+                    for(uint8_t i = 0; i < globals.fan_count; ++i)
+                    {
+                        digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
+                    }
+
+                    /* Enable when the strip is installed */
+                    /*digital(strip_buf, STRIP_LED_COUNT, 0, DEVICE_STRIP);*/
+
+                    convert_bufs();
+                    apply_brightness();
                 }
+                else
+                {
+                    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
+                    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
 
-                /* Enable when the strip is installed */
-                /*digital(strip_buf, STRIP_LED_COUNT, 0, DEVICE_STRIP);*/
-
-                convert_bufs();
-                apply_brightness();
-            }
-            else
-            {
-                set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
-                set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
-
-                set_color(pc_buf, 0, 0, 0, 0);
-                set_color(gpu_buf, 0, 0, 0, 0);
-            }
+                    set_color(pc_buf, 0, 0, 0, 0);
+                    set_color(gpu_buf, 0, 0, 0, 0);
+                }
 #if (COMPILE_CSGO != 0)
             }
 #endif /* (COMPILE_CSGO != 0) */
