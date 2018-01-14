@@ -3,6 +3,9 @@
 #ifndef LEDCONTROLLER_CSGO_H
 #define LEDCONTROLLER_CSGO_H
 
+#define COLOR_T rgb(255, 113, 12)
+#define COLOR_CT rgb(0, 71, 255)
+
 #define AMMO_COLOR_NORMAL rgb(255, 180, 0)
 #define AMMO_COLOR_LOW COLOR_RED
 #define AMMO_COLOR_NO_AMMO rgb(122, 213, 255)
@@ -12,8 +15,8 @@
 
 #define BOMB_SLOT_COLOR COLOR_RED
 #define BOMB_ANIMATION_TIME 64 /* in frames */
-#define BOMB_ANIMATION_LOW 150 /* in frames */
-#define BOMB_ANIMATION_HIGH 255 /* in frames */
+#define BOMB_ANIMATION_LOW 150
+#define BOMB_ANIMATION_HIGH 255
 
 #define HEALTH_COLOR_HIGH COLOR_GREEN
 #define HEALTH_COLOR_MEDIUM COLOR_YELLOW
@@ -22,16 +25,29 @@
 #define HEALTH_TRANSITION_TIME 16 /* in frames*/
 
 #define FLASH_COLOR COLOR_WHITE
-#define FLASH_TRANSITION_TIME_UP 4
-#define FLASH_TRANSITION_TIME_DOWN 8
+#define FLASH_TRANSITION_TIME_UP 4 /* in frames*/
+#define FLASH_TRANSITION_TIME_DOWN 8 /* in frames*/
 
 #define DAMAGE_COLOR COLOR_RED
 #define DAMAGE_MIN_ON_DEATH 50
 #define DAMAGE_BRIGHTNESS_MULTIPLIER 5 / 2
-#define DAMAGE_TRANSITION_TIME 8
-#define DAMAGE_ANIMATION_START 16
-#define DAMAGE_ANIMATION_TIME 192
-#define DAMAGE_BUFFER_TIME 32
+#define DAMAGE_TRANSITION_TIME 8 /* in frames*/
+#define DAMAGE_ANIMATION_START 16 /* in frames*/
+#define DAMAGE_ANIMATION_TIME 192 /* in frames*/
+#define DAMAGE_BUFFER_TIME 32 /* in frames*/
+
+#define BOMB_TICK_COLOR COLOR_BLACK
+#define BOMB_TICK_COLOR_BACKUP COLOR_RED
+#define BOMB_EXPLODE_COLOR COLOR_T
+#define BOMB_DEFUSE_COLOR COLOR_CT
+#define BOMB_TICK_INIT 100
+#define BOMB_TICK_DECREASE 2
+#define BOMB_EXPLODE_TIME 12
+
+#define BOMB_NO_STATE 0
+#define BOMB_PLANTED 1
+#define BOMB_EXPLODED 2
+#define BOMB_DEFUSED 3
 
 typedef struct
 {
@@ -39,7 +55,7 @@ typedef struct
     uint8_t flashed;
     uint8_t ammo;
     uint8_t weapon_slot;
-    uint8_t bomb_progress;
+    uint8_t bomb_state;
 } __attribute__((packed)) game_state;
 
 
@@ -55,11 +71,17 @@ typedef struct
     uint16_t damage_buffer_frame;
     uint8_t damage_animate;
     uint8_t bomb_tick_frame;
+    uint16_t bomb_overall_frame;
+    uint16_t bomb_frame;
+    uint16_t bomb_tick_rate;
 } csgo_control;
 
-#define csgo_increment_frames() csgo_ctrl.ammo_frame++;\
+#define csgo_increment_frames() \
+csgo_ctrl.ammo_frame++;\
 csgo_ctrl.health_frame++;\
 csgo_ctrl.bomb_tick_frame++;\
+csgo_ctrl.bomb_overall_frame++;\
+csgo_ctrl.bomb_frame++;\
 csgo_ctrl.flash_frame++;\
 csgo_ctrl.damage_frame++;\
 csgo_ctrl.damage_transition_frame++;\

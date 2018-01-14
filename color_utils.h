@@ -49,6 +49,7 @@
 #define TIME_DELAY 5
 
 #define rgb(r, g, b) r, g, b
+#define is_black(buf) !(buf[0] || buf[1] || buf[2])
 
 #define COLOR_BLACK rgb(0, 0, 0)
 #define COLOR_WHITE rgb(255, 255, 255)

@@ -8,6 +8,7 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
 {
     //<editor-fold desc="Ammunition on CPU fan">
     /* Number from 0-255*led_count, used to make the effect smooth */
+    uint8_t fan_black = 0;
     if(state->weapon_slot == 1 || state->weapon_slot == 2)
     {
         //<editor-fold desc="1, 2 slot">
@@ -77,6 +78,7 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
     }
     else
     {
+        fan_black = 1;
         set_all_colors(fan, COLOR_BLACK, FAN_LED_COUNT);
     }
     //</editor-fold>
@@ -184,6 +186,77 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
 
     //</editor-fold>
 
+    if(state->bomb_state == BOMB_PLANTED)
+    {
+        if(control->bomb_tick_rate > 0)
+        {
+            if(control->bomb_overall_frame >= 2440)
+            {
+                uint8_t analog_base[9] = {pc[0], pc[1], pc[2], gpu[0], gpu[1], gpu[2], BOMB_TICK_COLOR};
+                uint16_t progress = control->bomb_frame * (uint32_t) UINT16_MAX / control->bomb_tick_rate * 2;
+                cross_fade(pc, analog_base, 0, 6, progress);
+                cross_fade(gpu, analog_base, 3, 6, progress);
+
+                uint8_t fan_cpy[FAN_LED_COUNT * 3 + 3];
+                memcpy(fan_cpy, fan, FAN_LED_COUNT * 3);
+                fan_cpy[FAN_LED_COUNT * 3] = analog_base[6];
+                fan_cpy[FAN_LED_COUNT * 3 + 1] = analog_base[7];
+                fan_cpy[FAN_LED_COUNT * 3 + 2] = analog_base[8];
+                for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
+                {
+                    cross_fade(fan + i * 3, fan_cpy, i * 3, FAN_LED_COUNT * 3, progress);
+                }
+
+                if(control->bomb_frame >= control->bomb_tick_rate)
+                {
+                    control->bomb_tick_rate = 0;
+                }
+            }
+            else
+            {
+                uint8_t analog_base[12] = {pc[0], pc[1], pc[2], gpu[0], gpu[1], gpu[2], BOMB_TICK_COLOR, BOMB_TICK_COLOR_BACKUP};
+                uint16_t progress = control->bomb_frame * (uint32_t) UINT16_MAX / control->bomb_tick_rate;
+                progress = (progress > INT16_MAX ? UINT16_MAX - progress : progress) * 2;
+                cross_fade(pc, analog_base, 0, is_black(pc) ? 9 : 6, progress);
+                cross_fade(gpu, analog_base, 3, is_black(gpu) ? 9 : 6, progress);
+
+                uint8_t fan_cpy[FAN_LED_COUNT * 3 + 3];
+                memcpy(fan_cpy, fan, FAN_LED_COUNT * 3);
+                fan_cpy[FAN_LED_COUNT * 3] = analog_base[6 + (fan_black ? 3 : 0)];
+                fan_cpy[FAN_LED_COUNT * 3 + 1] = analog_base[6 + (fan_black ? 3 : 0)];
+                fan_cpy[FAN_LED_COUNT * 3 + 2] = analog_base[8 + (fan_black ? 3 : 0)];
+                for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
+                {
+                    cross_fade(fan + i * 3, fan_cpy, i * 3, FAN_LED_COUNT * 3, progress);
+                }
+            }
+        }
+        else
+        {
+            set_color(gpu, 0, COLOR_BLACK);
+            set_color(pc, 0, COLOR_BLACK);
+            set_all_colors(fan, COLOR_BLACK, FAN_LED_COUNT);
+        }
+    }
+    else if(state->bomb_state == BOMB_EXPLODED)
+    {
+        uint8_t color[] = {BOMB_EXPLODE_COLOR};
+        uint16_t times[] = {0, BOMB_EXPLODE_TIME, 600};
+        uint8_t args[] = {0, 0, 255};
+        simple_effect(BREATHE, pc, control->bomb_overall_frame, times, args, color, 1, 1);
+        simple_effect(BREATHE, gpu, control->bomb_overall_frame, times, args, color, 1, 1);
+        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->bomb_overall_frame, times, args, color, 1, 1);
+    }
+    else if(state->bomb_state == BOMB_DEFUSED)
+    {
+        uint8_t color[] = {BOMB_DEFUSE_COLOR};
+        uint16_t times[] = {0, BOMB_EXPLODE_TIME, 600};
+        uint8_t args[] = {0, 0, 255};
+        simple_effect(BREATHE, pc, control->bomb_overall_frame, times, args, color, 1, 1);
+        simple_effect(BREATHE, gpu, control->bomb_overall_frame, times, args, color, 1, 1);
+        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->bomb_overall_frame, times, args, color, 1, 1);
+    }
+
     //<editor-fold desc="Flash">
     uint8_t transition_flash = old_state->flashed - (old_state->flashed - state->flashed) * control->flash_frame /
                                                     (old_state->flashed > state->flashed ? FLASH_TRANSITION_TIME_DOWN
@@ -232,6 +305,11 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
     if(control->damage_transition_frame >= DAMAGE_TRANSITION_TIME)
     {
         control->damage_previous = control->damage;
+    }
+    if(state->bomb_state == BOMB_PLANTED && control->bomb_tick_rate &&  control->bomb_frame >= control->bomb_tick_rate)
+    {
+        control->bomb_frame = 0;
+        control->bomb_tick_rate -= BOMB_TICK_DECREASE;
     }
     //</editor-fold>
 }

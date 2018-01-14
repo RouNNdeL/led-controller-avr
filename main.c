@@ -513,6 +513,13 @@ void process_uart()
                         csgo_ctrl.damage = csgo_ctrl.damage > DAMAGE_MIN_ON_DEATH ? csgo_ctrl.damage : DAMAGE_MIN_ON_DEATH;
                     }
 
+                    if(csgo_state.bomb_state != old_csgo_state.bomb_state)
+                    {
+                        csgo_ctrl.bomb_frame = 0;
+                        csgo_ctrl.bomb_overall_frame = 0;
+                        csgo_ctrl.bomb_tick_rate = BOMB_TICK_INIT;
+                    }
+
                     csgo_ctrl.ammo_frame = 0;
                     csgo_ctrl.health_frame = 0;
                     csgo_ctrl.bomb_tick_frame = 0;
@@ -651,6 +658,9 @@ int main(void)
             {
                 //csgo_state.ammo = 255 - (frame % UINT8_MAX);
                 process_csgo(&csgo_ctrl, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf);
+
+                /*if(!(frame % 64))
+                    transmit_bytes((uint8_t *) &csgo_ctrl.bomb_overall_frame, 2);*/
 
                 csgo_increment_frames();
 
