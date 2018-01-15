@@ -286,7 +286,7 @@ void init_avr()
 void init_eeprom()
 {
     eeprom_read_block(&globals, &globals_addr, GLOBALS_LENGTH);
-    auto_increment = time_to_frames(globals.auto_increment);
+    auto_increment = time_to_frames(globals.auto_increment) * AUTO_INCREMENT_MULTIPLIER;
 
     change_profile(globals.n_profile);
     convert_all_frames();
@@ -374,7 +374,7 @@ void process_uart()
                         refresh_profile();
                         frame = 0;
                     }
-                    auto_increment = time_to_frames(globals.auto_increment);
+                    auto_increment = time_to_frames(globals.auto_increment) * AUTO_INCREMENT_MULTIPLIER;
 
                     uart_transmit(RECEIVE_SUCCESS);
 
