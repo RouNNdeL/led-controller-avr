@@ -525,6 +525,7 @@ void process_uart()
                     csgo_ctrl.bomb_tick_frame = 0;
                     csgo_ctrl.flash_frame = 0;
                     csgo_ctrl.damage_transition_frame = 0;
+                    csgo_ctrl.round_end_frame = 0;
 
                     uart_transmit(RECEIVE_SUCCESS);
 

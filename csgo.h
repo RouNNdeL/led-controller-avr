@@ -44,6 +44,8 @@
 #define BOMB_TICK_DECREASE 2
 #define BOMB_EXPLODE_TIME 12
 
+#define ROUND_END_TRANSITION_TIME 16
+
 #define BOMB_NO_STATE 0
 #define BOMB_PLANTED 1
 #define BOMB_EXPLODED 2
@@ -56,6 +58,7 @@ typedef struct
     uint8_t ammo;
     uint8_t weapon_slot;
     uint8_t bomb_state;
+    uint8_t round_win;
 } __attribute__((packed)) game_state;
 
 
@@ -74,6 +77,7 @@ typedef struct
     uint16_t bomb_overall_frame;
     uint16_t bomb_frame;
     uint16_t bomb_tick_rate;
+    uint16_t round_end_frame;
 } csgo_control;
 
 #define csgo_increment_frames() \
@@ -85,7 +89,8 @@ csgo_ctrl.bomb_frame++;\
 csgo_ctrl.flash_frame++;\
 csgo_ctrl.damage_frame++;\
 csgo_ctrl.damage_transition_frame++;\
-csgo_ctrl.damage_buffer_frame++
+csgo_ctrl.damage_buffer_frame++;\
+csgo_ctrl.round_end_frame++
 
 #define CSGO_STATE_LENGTH sizeof(game_state)
 

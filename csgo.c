@@ -238,24 +238,27 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
             set_all_colors(fan, COLOR_BLACK, FAN_LED_COUNT);
         }
     }
-    else if(state->bomb_state == BOMB_EXPLODED)
+
+    //<editor-fold desc="Round end">
+    if(state->round_win == 1)
     {
-        uint8_t color[] = {BOMB_EXPLODE_COLOR};
-        uint16_t times[] = {0, BOMB_EXPLODE_TIME, 600};
+        uint8_t color[] = {COLOR_T};
+        uint16_t times[] = {0, ROUND_END_TRANSITION_TIME, 600};
         uint8_t args[] = {0, 0, 255};
-        simple_effect(BREATHE, pc, control->bomb_overall_frame, times, args, color, 1, 1);
-        simple_effect(BREATHE, gpu, control->bomb_overall_frame, times, args, color, 1, 1);
-        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->bomb_overall_frame, times, args, color, 1, 1);
+        simple_effect(BREATHE, pc, control->round_end_frame, times, args, color, 1, 1);
+        simple_effect(BREATHE, gpu, control->round_end_frame, times, args, color, 1, 1);
+        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->round_end_frame, times, args, color, 1, 1);
     }
-    else if(state->bomb_state == BOMB_DEFUSED)
+    else if(state->round_win == 2)
     {
-        uint8_t color[] = {BOMB_DEFUSE_COLOR};
-        uint16_t times[] = {0, BOMB_EXPLODE_TIME, 600};
+        uint8_t color[] = {COLOR_CT};
+        uint16_t times[] = {0, ROUND_END_TRANSITION_TIME, 600};
         uint8_t args[] = {0, 0, 255};
-        simple_effect(BREATHE, pc, control->bomb_overall_frame, times, args, color, 1, 1);
-        simple_effect(BREATHE, gpu, control->bomb_overall_frame, times, args, color, 1, 1);
-        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->bomb_overall_frame, times, args, color, 1, 1);
+        simple_effect(BREATHE, pc, control->round_end_frame, times, args, color, 1, 1);
+        simple_effect(BREATHE, gpu, control->round_end_frame, times, args, color, 1, 1);
+        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->round_end_frame, times, args, color, 1, 1);
     }
+    //</editor-fold>
 
     //<editor-fold desc="Flash">
     uint8_t transition_flash = old_state->flashed - (old_state->flashed - state->flashed) * control->flash_frame /
