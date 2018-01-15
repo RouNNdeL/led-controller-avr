@@ -489,11 +489,58 @@ void process_uart()
                 }
                 else if(uart_buffer_length >= CSGO_STATE_LENGTH)
                 {
-                    old_csgo_state = csgo_state;
-
+                    game_state new_state;
                     uart_flags |= UART_FLAG_LOCK;
-                    memcpy(&csgo_state, (const void *) (uart_buffer), CSGO_STATE_LENGTH);
+                    memcpy(&new_state, (const void *) (uart_buffer), CSGO_STATE_LENGTH);
                     uart_flags &= ~UART_FLAG_LOCK;
+
+                    //<editor-fold desc="Reset frames for new data">
+                    if(new_state.ammo != csgo_state.ammo)
+                    {
+                        old_csgo_state.ammo = csgo_state.ammo;
+                        csgo_state.ammo = new_state.ammo;
+                        csgo_ctrl.ammo_frame = 0;
+                    }
+                    if(new_state.health != csgo_state.health)
+                    {
+                        old_csgo_state.health = csgo_state.health;
+                        csgo_state.health = new_state.health;
+                        csgo_ctrl.health_frame = 0;
+                        csgo_ctrl.damage_transition_frame = 0;
+                    }
+                    if(new_state.ammo != csgo_state.ammo)
+                    {
+                        old_csgo_state.ammo = csgo_state.ammo;
+                        csgo_state.ammo = new_state.ammo;
+                        csgo_ctrl.ammo_frame = 0;
+                    }
+                    if(new_state.flashed != csgo_state.flashed)
+                    {
+                        old_csgo_state.flashed = csgo_state.flashed;
+                        csgo_state.flashed = new_state.flashed;
+                        csgo_ctrl.flash_frame = 0;
+                    }
+                    if(new_state.round_state != csgo_state.round_state)
+                    {
+                        old_csgo_state.round_state = csgo_state.round_state;
+                        csgo_state.round_state = new_state.round_state;
+                        csgo_ctrl.round_state_frame = 0;
+                    }
+                    if(new_state.weapon_slot != csgo_state.weapon_slot)
+                    {
+                        old_csgo_state.weapon_slot = csgo_state.weapon_slot;
+                        csgo_state.weapon_slot = new_state.weapon_slot;
+                        csgo_ctrl.ammo_frame = 0;
+                        csgo_ctrl.bomb_tick_frame = 0;
+                    }
+                    if(new_state.bomb_state != csgo_state.bomb_state)
+                    {
+                        old_csgo_state.bomb_state = csgo_state.bomb_state;
+                        csgo_state.bomb_state = new_state.bomb_state;
+                        csgo_ctrl.bomb_overall_frame = 0;
+                        csgo_ctrl.bomb_frame = 0;
+                    }
+                    //</editor-fold>
 
                     if(!csgo_ctrl.damage && old_csgo_state.health > csgo_state.health)
                     {
@@ -519,13 +566,6 @@ void process_uart()
                         csgo_ctrl.bomb_overall_frame = 0;
                         csgo_ctrl.bomb_tick_rate = BOMB_TICK_INIT;
                     }
-
-                    csgo_ctrl.ammo_frame = 0;
-                    csgo_ctrl.health_frame = 0;
-                    csgo_ctrl.bomb_tick_frame = 0;
-                    csgo_ctrl.flash_frame = 0;
-                    csgo_ctrl.damage_transition_frame = 0;
-                    csgo_ctrl.round_end_frame = 0;
 
                     uart_transmit(RECEIVE_SUCCESS);
 
