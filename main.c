@@ -33,7 +33,7 @@ volatile uint8_t flags = 0;
 //</editor-fold>
 
 //<editor-fold desc="Data">
-
+#if (COMPILE_EFFECTS != 0)
 profile EEMEM profiles[PROFILE_COUNT];
 global_settings EEMEM globals_addr;
 
@@ -51,10 +51,11 @@ uint16_t auto_increment;
 #define refresh_profile() change_profile(globals.profile_order[globals.n_profile]); convert_all_frames()
 
 #define brightness(color) (color * globals.brightness) / UINT8_MAX
+#endif /* (COMPILE_EFFECTS != 0) */
 //</editor-fold>
 
 //<editor-fold desc="Uart">
-
+#if (COMPILE_UART != 0)
 volatile uint8_t uart_control = 0x00;
 volatile uint8_t uart_buffer[64];
 volatile uint8_t uart_buffer_length = 0;
@@ -64,6 +65,7 @@ volatile uint8_t uart_buffer_length = 0;
 uint8_t uart_flags = 0;
 
 #define reset_uart() uart_buffer_length = 0;uart_flags &= ~UART_FLAG_RECEIVE;uart_control = 0x00
+#endif /* (COMPILE_UART != 0) */
 //</editor-fold>
 
 //<editor-fold desc="Hardware">
@@ -72,7 +74,6 @@ uint8_t fan_buf[FAN_LED_COUNT * MAX_FAN_COUNT * 3];
 uint8_t strip_buf[(STRIP_LED_COUNT + 1) * 3];
 uint8_t pc_buf[3];
 uint8_t gpu_buf[3];
-uint8_t gpu_buf_cpy[3];
 
 #define output_pc(color) output_analog1(color[0], color[1], color[2])
 #define output_gpu(color) output_analog2(color[2], color[1], color[0])
@@ -91,7 +92,9 @@ csgo_control csgo_ctrl = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 #endif /* (COMPILE_CSGO != 0) */
 
 volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
+#if (COMPILE_DEMOS != 0)
 uint8_t demo = 0;
+#endif /* (COMPILE_DEMOS != 0) */
 
 void convert_bufs()
 {
@@ -127,6 +130,7 @@ void convert_bufs()
     }
 }
 
+#if (COMPILE_EFFECTS !=0)
 void apply_brightness()
 {
     for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
@@ -158,6 +162,7 @@ void apply_brightness()
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
+#endif /* (COMPILE_EFFECTS !=0) */
 
 void output_analog1(uint8_t q1, uint8_t q2, uint8_t q3)
 {
@@ -226,6 +231,7 @@ void convert_to_frames(uint16_t *frames, uint8_t *times)
     frames[5] = time_to_frames(times[5]);
 }
 
+#if (COMPILE_EFFECTS !=0)
 void convert_all_frames()
 {
     for(uint8_t i = 0; i < 6; ++i)
@@ -233,6 +239,7 @@ void convert_all_frames()
         convert_to_frames(frames[i], current_profile.devices[i].timing);
     }
 }
+#endif /* (COMPILE_EFFECTS !=0) */
 
 void update()
 {
@@ -283,6 +290,7 @@ void init_avr()
     set_color(gpu_buf, 0, 0, 0, 0);
 }
 
+#if (COMPILE_EFFECTS !=0)
 void init_eeprom()
 {
     eeprom_read_block(&globals, &globals_addr, GLOBALS_LENGTH);
@@ -291,13 +299,16 @@ void init_eeprom()
     change_profile(globals.n_profile);
     convert_all_frames();
 }
+#endif /* (COMPILE_EFFECTS !=0) */
 
+#if (COMPILE_UART != 0)
 void process_uart()
 {
     if(uart_control)
     {
         switch(uart_control)
         {
+#if  (COMPILE_EFFECTS !=0)
             case SAVE_PROFILE:
             {
                 //<editor-fold desc="Save profile">
@@ -318,7 +329,8 @@ void process_uart()
                         {
                             /* Lock the buffer before reading it */
                             uart_flags |= UART_FLAG_LOCK;
-                            memcpy(&(current_profile.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
+                            memcpy(&(current_profile.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2),
+                                   DEVICE_LENGTH);
                             uart_flags &= ~UART_FLAG_LOCK;
                             convert_to_frames(frames[uart_buffer[1]], current_profile.devices[uart_buffer[1]].timing);
 
@@ -331,7 +343,8 @@ void process_uart()
 
                             /* Lock the buffer before reading it */
                             uart_flags |= UART_FLAG_LOCK;
-                            memcpy(&(received.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
+                            memcpy(&(received.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2),
+                                   DEVICE_LENGTH);
                             uart_flags &= ~UART_FLAG_LOCK;
 
                             save_profile(received, uart_buffer[0]);
@@ -415,6 +428,18 @@ void process_uart()
                 uart_control = 0x00;
                 break;
             }
+            case SAVE_EXPLICIT:
+            {
+                if(flags & FLAG_PROFILE_UPDATED)
+                {
+                    save_profile(current_profile, globals.profile_order[globals.n_profile]);
+                    flags &= ~FLAG_PROFILE_UPDATED;
+                }
+                uart_transmit(RECEIVE_SUCCESS);
+
+                reset_uart();
+                break;
+            }
             case TEMP_DEVICE:
             {
                 //<editor-fold desc="Temporary device (for Google Assistant)">
@@ -439,6 +464,18 @@ void process_uart()
                 break;
                 //</editor-fold>
             }
+#else
+            case SAVE_PROFILE:
+            case SAVE_GLOBALS:
+            case SEND_GLOBALS:
+            case SEND_PROFILE:
+            case SAVE_EXPLICIT:
+            case TEMP_DEVICE:
+            {
+                uart_transmit(EFFECTS_DISABLED);
+                break;
+            }
+#endif /* (COMPILE_EFFECTS !=0) */
             case DEMO_START_MUSIC:
             case DEMO_START_EFFECTS:
             {
@@ -449,18 +486,6 @@ void process_uart()
 #else
                 uart_transmit(DEMOS_DISABLED);
 #endif /* (COMPILE_DEMOS != 0) */
-                break;
-            }
-            case SAVE_EXPLICIT:
-            {
-                if(flags & FLAG_PROFILE_UPDATED)
-                {
-                    save_profile(current_profile, globals.profile_order[globals.n_profile]);
-                    flags &= ~FLAG_PROFILE_UPDATED;
-                }
-                uart_transmit(RECEIVE_SUCCESS);
-
-                reset_uart();
                 break;
             }
 #if (COMPILE_CSGO != 0)
@@ -592,20 +617,27 @@ void process_uart()
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "ImplicitIntegerAndEnumConversion"
 #pragma clang diagnostic ignored "-Wsign-conversion"
+#endif /* (COMPILE_UART != 0) */
 
 int main(void)
 {
     init_avr();
+#if (COMPILE_UART != 0)
     init_uart();
+#endif /* (COMPILE_UART != 0) */
 
+#if (COMPILE_BUTTONS != 0)
     uint32_t button_frame = 0;
     uint32_t reset_frame = 0;
-
+#endif /* (COMPILE_BUTTONS != 0) */
+#if (COMPILE_EFFECTS != 0)
     init_eeprom();
+#endif /* (COMPILE_EFFECTS != 0) */
 
     while(1)
     {
         //<editor-fold desc="Buttons">
+#if (COMPILE_BUTTONS != 0)
         if((PINA & PIN_BUTTON) && !(flags & FLAG_BUTTON))
         {
             button_frame = frame;
@@ -647,13 +679,18 @@ int main(void)
             button_frame = 0;
             flags &= ~FLAG_BUTTON;
         }
+#endif /* (COMPILE_BUTTONS != 0) */
         //</editor-fold>
 
+#if (COMPILE_UART != 0)
         process_uart();
+#endif /* (COMPILE_UART != 0) */
 
         if(flags & FLAG_NEW_FRAME)
         {
             flags &= ~FLAG_NEW_FRAME;
+
+#if (COMPILE_EFFECTS != 0)
             if(auto_increment && frame && frame % auto_increment == 0 && globals.leds_enabled)
             {
                 if(flags & FLAG_PROFILE_UPDATED)
@@ -666,6 +703,7 @@ int main(void)
                 uart_transmit(GLOBALS_UPDATED);
                 frame = 0;
             }
+#endif /* (COMPILE_EFFECTS != 0) */
 
 #if (COMPILE_DEMOS != 0)
             if(demo)
@@ -711,30 +749,34 @@ int main(void)
             else
             {
 #endif /* (COMPILE_CSGO != 0) */
-                if(globals.leds_enabled)
+#if (COMPILE_EFFECTS != 0)
+            if(globals.leds_enabled)
+            {
+                simple(pc_buf, DEVICE_PC);
+                simple(gpu_buf, DEVICE_GPU);
+
+                for(uint8_t i = 0; i < globals.fan_count; ++i)
                 {
-                    simple(pc_buf, DEVICE_PC);
-                    simple(gpu_buf, DEVICE_GPU);
-
-                    for(uint8_t i = 0; i < globals.fan_count; ++i)
-                    {
-                        digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
-                    }
-
-                    /* Enable when the strip is installed */
-                    /*digital(strip_buf, STRIP_LED_COUNT, 0, DEVICE_STRIP);*/
-
-                    convert_bufs();
-                    apply_brightness();
+                    digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
                 }
-                else
-                {
-                    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
-                    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
+                set_color(pc_buf, 0, 0, 0, 0);
+                set_color(gpu_buf, 0, 0, 0, 0);
 
-                    set_color(pc_buf, 0, 0, 0, 0);
-                    set_color(gpu_buf, 0, 0, 0, 0);
-                }
+                /* Enable when the strip is installed */
+                /*digital(strip_buf, STRIP_LED_COUNT, 0, DEVICE_STRIP);*/
+
+                convert_bufs();
+                apply_brightness();
+            }
+            else
+            {
+                set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
+                set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
+
+                set_color(pc_buf, 0, 0, 0, 0);
+                set_color(gpu_buf, 0, 0, 0, 0);
+            }
+#endif /* (COMPILE_EFFECTS != 0) */
 #if (COMPILE_CSGO != 0)
             }
 #endif /* (COMPILE_CSGO != 0) */
@@ -742,12 +784,13 @@ int main(void)
             }
 #endif /* (COMPILE_DEMOS != 0) */
 
-
+#if (COMPILE_BUTTONS != 0)
             if((flags & FLAG_RESET) && frame > reset_frame)
             {
                 PORTD &= ~PIN_RESET;
                 flags &= ~FLAG_RESET;
             }
+#endif /* (COMPILE_BUTTONS != 0) */
         }
     }
 }
@@ -761,6 +804,7 @@ ISR(TIMER3_COMPA_vect)
     update();
 }
 
+#if (COMPILE_UART != 0)
 ISR(USART0_RX_vect)
 {
     uint8_t val = UDR0;
@@ -778,3 +822,4 @@ ISR(USART0_RX_vect)
         uart_transmit(BUFFER_OVERFLOW);
     }
 }
+#endif /* (COMPILE_UART != 0) */

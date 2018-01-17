@@ -3,7 +3,10 @@
 
 #define FPS 64
 #define COMPILE_DEMOS 0 /* Demos take up a lot of memory, disable them here */
-#define COMPILE_CSGO 1
+#define COMPILE_CSGO 0
+#define COMPILE_UART 1
+#define COMPILE_BUTTONS 0
+#define COMPILE_EFFECTS 0
 
 /* Note: These change the color representation of a color */
 #define ACTUAL_BRIGHTNESS_DIGITAL 1 /* Whether to compile in use of log brightness function for WS2812B */

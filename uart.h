@@ -16,6 +16,7 @@
 #define UART_READY 0xA2
 
 #define GLOBALS_UPDATED 0xB0
+#define EFFECTS_DISABLED 0xBE
 
 #define CSGO_BEGIN 0xC0
 #define CSGO_NEW_STATE 0xC1
