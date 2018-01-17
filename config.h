@@ -3,10 +3,10 @@
 
 #define FPS 64
 #define COMPILE_DEMOS 0 /* Demos take up a lot of memory, disable them here */
-#define COMPILE_CSGO 0
-#define COMPILE_UART 0
-#define COMPILE_BUTTONS 0
-#define COMPILE_EFFECTS 0
+#define COMPILE_CSGO 1
+#define COMPILE_UART 1
+#define COMPILE_BUTTONS 1
+#define COMPILE_EFFECTS 1
 
 #if (COMPILE_EFFECTS == 0 && COMPILE_DEMOS == 0 && COMPILE_CSGO == 0)
 #    warning All intercations have been disabled, this state is undesirable in production

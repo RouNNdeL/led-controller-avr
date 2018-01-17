@@ -58,6 +58,11 @@
 r * brightness / UINT8_MAX, g * brightness / UINT8_MAX, b * brightness / UINT8_MAX
 #define color_brightness(brightness, ...) _color_brightness(brightness, __VA_ARGS__)
 #define color_from_buf(buf) (buf)[0], (buf)[1], (buf)[2]
+#define set_color_manual(buf, ...) _set_color_manual(buf, __VA_ARGS__)
+#define _set_color_manual(buf, r, g, b)\
+(buf)[0] = r;\
+(buf)[1] = g;\
+(buf)[2] = b
 
 #define COLOR_BLACK rgb(0, 0, 0)
 #define COLOR_WHITE rgb(255, 255, 255)
@@ -85,7 +90,7 @@ void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t cou
 
 void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b);
 
-void cross_fade(uint8_t *color, uint8_t *colors, uint8_t n_color, uint8_t m_color, uint16_t progress);
+void cross_fade(uint8_t *color, uint8_t *colors, uint8_t n_color, uint8_t m_color, uint8_t progress);
 
 void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, uint8_t start_led, uint16_t piece_leds,
                 uint8_t bit_pack, uint8_t *colors, uint8_t color_count);

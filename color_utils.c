@@ -21,22 +21,22 @@ void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t cou
 }
 
 //TODO: Change progress to uint8_t, as it's precision will be enough
-void cross_fade(uint8_t *color, uint8_t *colors, uint8_t n_color, uint8_t m_color, uint16_t progress)
+void cross_fade(uint8_t *color, uint8_t *colors, uint8_t n_color, uint8_t m_color, uint8_t progress)
 {
     if(colors[n_color] > colors[m_color])
-        color[0] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * (uint32_t) progress / UINT16_MAX;
+        color[0] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * (uint16_t) progress / UINT8_MAX;
     else
-        color[0] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * (uint32_t) progress / UINT16_MAX;
+        color[0] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * (uint16_t) progress / UINT8_MAX;
 
     if(colors[n_color] > colors[m_color])
-        color[1] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * (uint32_t) progress / UINT16_MAX;
+        color[1] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * (uint16_t) progress / UINT8_MAX;
     else
-        color[1] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * (uint32_t) progress / UINT16_MAX;
+        color[1] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * (uint16_t) progress / UINT8_MAX;
 
     if(colors[n_color] > colors[m_color])
-        color[2] = colors[n_color] - (colors[n_color] - colors[m_color]) * (uint32_t) progress / UINT16_MAX;
+        color[2] = colors[n_color] - (colors[n_color] - colors[m_color]) * (uint16_t) progress / UINT8_MAX;
     else
-        color[2] = colors[n_color] + (colors[m_color] - colors[n_color]) * (uint32_t) progress / UINT16_MAX;
+        color[2] = colors[n_color] + (colors[m_color] - colors[n_color]) * (uint16_t) progress / UINT8_MAX;
 }
 
 void rainbow_at_progress_full(uint8_t *color, uint16_t progress, uint8_t brightness)
@@ -133,15 +133,13 @@ void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, ui
         if(current_leds == 0 && led_carry && (bit_pack & SMOOTH))
         {
             cross_fade(leds + index, colors, color * 3,
-                       ((color + color_count - 1) % color_count) * 3, led_carry * UINT8_MAX);
+                       ((color + color_count - 1) % color_count) * 3, led_carry);
 
             current_leds = led_carry;
         }
         else if((current_leds += UINT8_MAX) <= piece_leds)
         {
-            leds[index] = colors[color * 3];
-            leds[index + 1] = colors[color * 3 + 1];
-            leds[index + 2] = colors[color * 3 + 2];
+            set_color_manual(leds+index, color_from_buf(colors+color*3));
         }
         else
         {
@@ -251,7 +249,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
         }
         else
         {
-            uint16_t progress = d_time * UINT16_MAX / times[TIME_FADEOUT];
+            uint8_t progress = d_time * UINT8_MAX / times[TIME_FADEOUT];
             if(effect == FADE)
             {
                 cross_fade(color, colors, n_color, m_color, progress);
@@ -358,28 +356,19 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     uint8_t n_color_for_piece = n_color + 3 * (((piece + 8 * arg_number)) % args[ARG_FILL_COLOR_COUNT]);
                     if(led_progress_current >= UINT8_MAX)
                     {
-                        leds[index] = colors[n_color_for_piece];
-                        leds[index + 1] = colors[n_color_for_piece + 1];
-                        leds[index + 2] = colors[n_color_for_piece + 2];
-
+                        set_color_manual(leds+index, color_from_buf(colors+n_color_for_piece));
 
                         led_progress_current -= UINT8_MAX;
                     }
                     else if(led_progress_current > 0 && (args[ARG_BIT_PACK] & SMOOTH))
                     {
-
-                        leds[index] = colors[n_color_for_piece] * led_progress_current / UINT8_MAX;
-                        leds[index + 1] = colors[n_color_for_piece + 1] * led_progress_current / UINT8_MAX;
-                        leds[index + 2] = colors[n_color_for_piece + 2] * led_progress_current / UINT8_MAX;
-
+                        set_color_manual(leds+index, color_brightness(led_progress_current, color_from_buf(colors+n_color_for_piece)));
 
                         led_progress_current = 0;
                     }
                     else
                     {
-                        leds[index] = 0x00;
-                        leds[index + 1] = 0x00;
-                        leds[index + 2] = 0x00;
+                        set_color_manual(leds+index, COLOR_BLACK);
                     }
                 }
             }
@@ -401,9 +390,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                 uint8_t index = (i + start_led) % led_count * 3;
 
                 uint8_t n_color_for_piece = n_color + 3 * (piece % args[ARG_FILL_COLOR_COUNT]);
-                leds[index] = colors[n_color_for_piece];
-                leds[index + 1] = colors[n_color_for_piece + 1];
-                leds[index + 2] = colors[n_color_for_piece + 2];
+                set_color(leds, index, color_from_buf(colors+n_color_for_piece));
             }
             //</editor-fold>
         }
@@ -446,9 +433,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
 
                 if(led_progress_current >= UINT8_MAX)
                 {
-                    leds[index] = colors[n_color_for_piece];
-                    leds[index + 1] = colors[n_color_for_piece + 1];
-                    leds[index + 2] = colors[n_color_for_piece + 2];
+                    set_color_manual(leds+index, color_from_buf(colors+n_color_for_piece));
 
                     led_progress_current -= UINT8_MAX;
                 }
@@ -458,9 +443,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     {
                         if(effect == FILL)
                         {
-                            leds[index] = colors[n_color_for_piece] * led_progress_current / UINT8_MAX;
-                            leds[index + 1] = colors[n_color_for_piece + 1] * led_progress_current / UINT8_MAX;
-                            leds[index + 2] = colors[n_color_for_piece + 2] * led_progress_current / UINT8_MAX;
+                            set_color_manual(leds+index, color_brightness(led_progress_current, color_from_buf(colors+n_color_for_piece)));
                         }
                         else
                         {
@@ -469,14 +452,12 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                                 uint8_t faded[6];
                                 set_color(faded, 0, colors[n_color_for_piece],
                                           colors[n_color_for_piece + 1], colors[n_color_for_piece + 2]);
-                                cross_fade(faded + 3, colors, m_color_for_piece, n_color_for_piece, progress);
-                                cross_fade(leds + index, faded, 3, 0,
-                                           led_progress_current * UINT8_MAX);
+                                cross_fade(faded + 3, colors, m_color_for_piece, n_color_for_piece, progress/UINT8_MAX);
+                                cross_fade(leds + index, faded, 3, 0, led_progress_current);
                             }
                             else
                             {
-                                cross_fade(leds + index, colors, m_color_for_piece, n_color_for_piece,
-                                           led_progress_current * UINT8_MAX);
+                                cross_fade(leds + index, colors, m_color_for_piece, n_color_for_piece, led_progress_current);
                             }
                         }
 
@@ -486,25 +467,17 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     {
                         if(effect == FILL)
                         {
-                            leds[index] = 0x00;
-                            leds[index + 1] = 0x00;
-                            leds[index + 2] = 0x00;
+                            set_color_manual(leds+index, COLOR_BLACK);
                         }
                         else
                         {
                             if(args[ARG_BIT_PACK] & FADE_SMOOTH)
                             {
-                                uint8_t faded[3];
-                                cross_fade(faded, colors, m_color_for_piece, n_color_for_piece, progress);
-                                leds[index] = faded[0];
-                                leds[index + 1] = faded[1];
-                                leds[index + 2] = faded[2];
+                                cross_fade(leds+index, colors, m_color_for_piece, n_color_for_piece, progress/UINT8_MAX);
                             }
                             else
                             {
-                                leds[index] = colors[m_color_for_piece];
-                                leds[index + 1] = colors[m_color_for_piece + 1];
-                                leds[index + 2] = colors[m_color_for_piece + 2];
+                                set_color_manual(leds+index, color_from_buf(colors+m_color_for_piece));
                             }
                         }
                     }
@@ -586,7 +559,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         else if((d_time -= times[TIME_ON]) < times[TIME_FADEOUT])
         {
             /* Crossfade based on progress if needed */
-            uint16_t progress = d_time * UINT16_MAX / times[TIME_FADEOUT];
+            uint8_t progress = d_time * UINT8_MAX / times[TIME_FADEOUT];
             uint8_t count = 0;
             uint8_t c_leds = 0;
 
