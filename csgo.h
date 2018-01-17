@@ -1,7 +1,7 @@
-#include <avr/io.h>
-
 #ifndef LEDCONTROLLER_CSGO_H
 #define LEDCONTROLLER_CSGO_H
+
+#include <avr/io.h>
 
 #define COLOR_T rgb(255, 113, 12)
 #define COLOR_CT rgb(0, 71, 255)

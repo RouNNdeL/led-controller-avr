@@ -1,8 +1,6 @@
 #include <avr/io.h>
-#include <unwind.h>
 #include <string.h>
 #include "color_utils.h"
-#include "uart.h"
 
 void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b)
 {
@@ -20,7 +18,6 @@ void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t cou
     }
 }
 
-//TODO: Change progress to uint8_t, as it's precision will be enough
 void cross_fade(uint8_t *color, uint8_t *colors, uint8_t n_color, uint8_t m_color, uint8_t progress)
 {
     if(colors[n_color] > colors[m_color])

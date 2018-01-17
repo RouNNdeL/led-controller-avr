@@ -1,5 +1,4 @@
 #include "uart.h"
-#include "eeprom.h"
 
 void init_uart()
 {
