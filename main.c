@@ -759,8 +759,6 @@ int main(void)
                 {
                     digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
                 }
-                set_color(pc_buf, 0, 0, 0, 0);
-                set_color(gpu_buf, 0, 0, 0, 0);
 
                 /* Enable when the strip is installed */
                 /*digital(strip_buf, STRIP_LED_COUNT, 0, DEVICE_STRIP);*/

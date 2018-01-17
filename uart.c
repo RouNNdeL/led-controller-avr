@@ -27,7 +27,7 @@ void uart_transmit(uint8_t data)
 
 uint8_t uart_receive()
 {
-    while(!(UCSR0A) & (1 << RXC0)); /* Wait while data is being received */
+    while((!(UCSR0A)) & (1 << RXC0)); /* Wait while data is being received */
     return UDR0;
 }
 

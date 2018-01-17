@@ -41,8 +41,12 @@
 #define ARG_ROTATING_ELEMENT_COUNT 2
 #define ARG_ROTATING_LED_COUNT 3
 
+#define ARG_PARTICLES_SIZE 1
+
 #define TIME_OFF 0
+#define TIME_PARTICLE_SPEED 0
 #define TIME_FADEIN 1
+#define TIME_PARTICLE_DELAY 1
 #define TIME_ON 2
 #define TIME_FADEOUT 3
 #define TIME_ROTATION 4
@@ -50,6 +54,10 @@
 
 #define rgb(r, g, b) r, g, b
 #define is_black(buf) !(buf[0] || buf[1] || buf[2])
+#define _color_brightness(brightness, r, g, b) \
+r * brightness / UINT8_MAX, g * brightness / UINT8_MAX, b * brightness / UINT8_MAX
+#define color_brightness(brightness, ...) _color_brightness(brightness, __VA_ARGS__)
+#define color_from_buf(buf) (buf)[0], (buf)[1], (buf)[2]
 
 #define COLOR_BLACK rgb(0, 0, 0)
 #define COLOR_WHITE rgb(255, 255, 255)
@@ -68,6 +76,7 @@ typedef enum
     RAINBOW = 0x03,
     FILL = 0x04,
     ROTATING = 0x05,
+    PARTICLES = 0x06,
     PIECES = 0x0C,
 
 } effect;
