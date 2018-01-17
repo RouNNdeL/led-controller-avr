@@ -232,13 +232,14 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
         }
         else
         {
-            uint8_t progress = d_time * UINT8_MAX / times[TIME_FADEOUT];
             if(effect == FADE)
             {
+                uint8_t progress = d_time * UINT8_MAX / times[TIME_FADEOUT];
                 cross_fade(color, colors, n_color, m_color, progress);
             }
             else
             {
+                uint16_t progress = d_time * UINT16_MAX / times[TIME_FADEOUT];
                 rainbow_at_progress_full(color, progress, args[ARG_RAINBOW_BRIGHTNESS]);
             }
         }
