@@ -1,6 +1,7 @@
 #include <avr/io.h>
 #include <string.h>
 #include "color_utils.h"
+#include "uart.h"
 
 void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b)
 {
@@ -132,7 +133,7 @@ void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, ui
         }
         else if((current_leds += UINT8_MAX) <= piece_leds)
         {
-            set_color_manual(leds+index, color_from_buf(colors+color*3));
+            set_color_manual(leds + index, color_from_buf(colors + color * 3));
         }
         else
         {
@@ -204,7 +205,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
         uint8_t delta_brightness = args[ARG_BREATHE_END] - args[ARG_BREATHE_START];
         uint8_t progress = d_time * delta_brightness / times[TIME_FADEIN] + args[ARG_BREATHE_START];
 
-        set_color_manual(color, color_brightness(progress, color_from_buf(colors+n_color)));
+        set_color_manual(color, color_brightness(progress, color_from_buf(colors + n_color)));
         //</editor-fold>
     }
     else if((d_time -= times[TIME_FADEIN]) < times[TIME_ON])
@@ -212,11 +213,11 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
         //<editor-fold desc="On">
         if(effect == BREATHE)
         {
-            set_color_manual(color, color_brightness(args[ARG_BREATHE_END], color_from_buf(colors+n_color)));
+            set_color_manual(color, color_brightness(args[ARG_BREATHE_END], color_from_buf(colors + n_color)));
         }
         else
         {
-            set_color_manual(color, color_from_buf(colors+n_color));
+            set_color_manual(color, color_from_buf(colors + n_color));
         }
         //</editor-fold>
     }
@@ -228,7 +229,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
             uint8_t delta_brightness = args[ARG_BREATHE_END] - args[ARG_BREATHE_START];
             uint8_t progress = args[ARG_BREATHE_END] - d_time * delta_brightness / times[TIME_FADEOUT];
 
-            set_color_manual(color, color_brightness(progress, color_from_buf(colors+n_color)));
+            set_color_manual(color, color_brightness(progress, color_from_buf(colors + n_color)));
         }
         else
         {
@@ -340,19 +341,20 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     uint8_t n_color_for_piece = n_color + 3 * (((piece + 8 * arg_number)) % args[ARG_FILL_COLOR_COUNT]);
                     if(led_progress_current >= UINT8_MAX)
                     {
-                        set_color_manual(leds+index, color_from_buf(colors+n_color_for_piece));
+                        set_color_manual(leds + index, color_from_buf(colors + n_color_for_piece));
 
                         led_progress_current -= UINT8_MAX;
                     }
                     else if(led_progress_current > 0 && (args[ARG_BIT_PACK] & SMOOTH))
                     {
-                        set_color_manual(leds+index, color_brightness(led_progress_current, color_from_buf(colors+n_color_for_piece)));
+                        set_color_manual(leds + index, color_brightness(led_progress_current,
+                                                                        color_from_buf(colors + n_color_for_piece)));
 
                         led_progress_current = 0;
                     }
                     else
                     {
-                        set_color_manual(leds+index, COLOR_BLACK);
+                        set_color_manual(leds + index, COLOR_BLACK);
                     }
                 }
             }
@@ -374,7 +376,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                 uint8_t index = (i + start_led) % led_count * 3;
 
                 uint8_t n_color_for_piece = n_color + 3 * (piece % args[ARG_FILL_COLOR_COUNT]);
-                set_color(leds, index, color_from_buf(colors+n_color_for_piece));
+                set_color(leds, index, color_from_buf(colors + n_color_for_piece));
             }
             //</editor-fold>
         }
@@ -417,7 +419,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
 
                 if(led_progress_current >= UINT8_MAX)
                 {
-                    set_color_manual(leds+index, color_from_buf(colors+n_color_for_piece));
+                    set_color_manual(leds + index, color_from_buf(colors + n_color_for_piece));
 
                     led_progress_current -= UINT8_MAX;
                 }
@@ -427,7 +429,8 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     {
                         if(effect == FILL)
                         {
-                            set_color_manual(leds+index, color_brightness(led_progress_current, color_from_buf(colors+n_color_for_piece)));
+                            set_color_manual(leds + index, color_brightness(led_progress_current, color_from_buf(
+                                    colors + n_color_for_piece)));
                         }
                         else
                         {
@@ -436,12 +439,14 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                                 uint8_t faded[6];
                                 set_color(faded, 0, colors[n_color_for_piece],
                                           colors[n_color_for_piece + 1], colors[n_color_for_piece + 2]);
-                                cross_fade(faded + 3, colors, m_color_for_piece, n_color_for_piece, progress/UINT8_MAX);
+                                cross_fade(faded + 3, colors, m_color_for_piece, n_color_for_piece,
+                                           progress / UINT8_MAX);
                                 cross_fade(leds + index, faded, 3, 0, led_progress_current);
                             }
                             else
                             {
-                                cross_fade(leds + index, colors, m_color_for_piece, n_color_for_piece, led_progress_current);
+                                cross_fade(leds + index, colors, m_color_for_piece, n_color_for_piece,
+                                           led_progress_current);
                             }
                         }
 
@@ -451,17 +456,18 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     {
                         if(effect == FILL)
                         {
-                            set_color_manual(leds+index, COLOR_BLACK);
+                            set_color_manual(leds + index, COLOR_BLACK);
                         }
                         else
                         {
                             if(args[ARG_BIT_PACK] & FADE_SMOOTH)
                             {
-                                cross_fade(leds+index, colors, m_color_for_piece, n_color_for_piece, progress/UINT8_MAX);
+                                cross_fade(leds + index, colors, m_color_for_piece, n_color_for_piece,
+                                           progress / UINT8_MAX);
                             }
                             else
                             {
-                                set_color_manual(leds+index, color_from_buf(colors+m_color_for_piece));
+                                set_color_manual(leds + index, color_from_buf(colors + m_color_for_piece));
                             }
                         }
                     }
@@ -521,12 +527,12 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                 if(effect == ROTATING &&
                    (i % (led_count / args[ARG_ROTATING_ELEMENT_COUNT])) >= args[ARG_ROTATING_LED_COUNT])
                 {
-                    set_color_manual(c_colors+index, COLOR_BLACK);
+                    set_color_manual(c_colors + index, COLOR_BLACK);
                 }
                 else
                 {
                     uint8_t c_index = count * 3;
-                    set_color_manual(c_colors+index, color_from_buf(colors + n_color + c_index));
+                    set_color_manual(c_colors + index, color_from_buf(colors + n_color + c_index));
                     c_leds++;
                     if(effect != ROTATING || c_leds >= args[ARG_ROTATING_LED_COUNT])
                     {
@@ -549,7 +555,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                 if(effect == ROTATING &&
                    (i % (led_count / args[ARG_PIECES_PIECE_COUNT])) >= args[ARG_ROTATING_LED_COUNT])
                 {
-                    set_color_manual(c_colors+index, COLOR_BLACK);
+                    set_color_manual(c_colors + index, COLOR_BLACK);
                 }
                 else
                 {
@@ -579,36 +585,38 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         uint16_t d_time = frame % times[TIME_PARTICLE_SPEED];
         uint16_t particle_progress =
                 (uint32_t) d_time * UINT8_MAX / times[TIME_PARTICLE_SPEED] * (led_count + args[ARG_PARTICLES_SIZE]);
-        uint8_t particle[args[ARG_PARTICLES_SIZE]];
-        for(int i = 0; i < args[ARG_PARTICLES_SIZE]; ++i)
+
+        uint8_t particle[args[ARG_PARTICLES_SIZE] + 2];
+        particle[0] = 0;
+        for(uint8_t i = 1; i <= args[ARG_PARTICLES_SIZE]; ++i)
         {
-            particle[i] = (i + 1) * UINT8_MAX / (args[ARG_PARTICLES_SIZE]);
+            particle[i] = i * UINT8_MAX / args[ARG_PARTICLES_SIZE];
             particle[i] = actual_brightness(particle[i]);
         }
+        particle[args[ARG_PARTICLES_SIZE]+1] = 0;
+
         uint8_t n_color = frame / times[TIME_PARTICLE_SPEED] % color_count * 3;
         for(uint8_t i = 0; i < led_count; ++i)
         {
-            uint8_t index =
-                    (((args[ARG_BIT_PACK] & DIRECTION) ? i : led_count - i - 1) + start_led) % led_count;
+            uint8_t index = (((args[ARG_BIT_PACK] & DIRECTION) ? i : led_count - i - 1) + start_led) % led_count * 3;
 
-            if((i + args[ARG_PARTICLES_SIZE]) * UINT8_MAX < particle_progress)
+            if((i + args[ARG_PARTICLES_SIZE] + 1) * UINT8_MAX < particle_progress)
             {
-                set_color(leds, index, COLOR_BLACK);
+                set_color_manual(leds + index, COLOR_BLACK);
             }
             else if(i * UINT8_MAX < particle_progress)
             {
-                uint8_t particle_index = args[ARG_PARTICLES_SIZE] - (particle_progress/ UINT8_MAX - i +1);
+                uint8_t p_index = i - (particle_progress / UINT8_MAX - args[ARG_PARTICLES_SIZE]);
                 uint8_t _colors[6];
-                set_color(_colors, 0, color_brightness(particle[particle_index], color_from_buf(colors+n_color)));
-                if(particle_index + 1 < args[ARG_PARTICLES_SIZE])
-                    set_color(_colors, 1, color_brightness(particle[particle_index+1], color_from_buf(colors+n_color)));
-                else
-                    set_color(_colors, 1, COLOR_BLACK);
-                cross_fade(leds+index*3, _colors, 3, 0, (particle_progress % UINT8_MAX) * UINT8_MAX);
+
+                set_color_manual(_colors, color_brightness(particle[p_index], color_from_buf(colors+n_color)));
+                set_color_manual(_colors+3, color_brightness(particle[p_index+1], color_from_buf(colors+n_color)));
+
+                cross_fade(leds + index, _colors, 3, 0, args[ARG_BIT_PACK] & SMOOTH ? particle_progress % UINT8_MAX : UINT8_MAX);
             }
             else
             {
-                set_color(leds, index, COLOR_BLACK);
+                set_color_manual(leds + index, COLOR_BLACK);
             }
         }
     }
