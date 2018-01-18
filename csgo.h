@@ -38,6 +38,7 @@
 
 #define BOMB_TICK_COLOR COLOR_BLACK
 #define BOMB_TICK_COLOR_BACKUP COLOR_RED
+#define BOMB_BEEP_COLOR COLOR_BLACK
 #define BOMB_EXPLODE_COLOR COLOR_T
 #define BOMB_DEFUSE_COLOR COLOR_CT
 #define BOMB_TICK_INIT 100
@@ -80,7 +81,7 @@ typedef struct
     uint16_t damage_transition_frame;
     uint16_t damage_buffer_frame;
     uint8_t damage_animate;
-    uint8_t bomb_tick_frame;
+    uint8_t bomb_slot_frame;
     uint16_t bomb_overall_frame;
     uint16_t bomb_frame;
     uint16_t bomb_tick_rate;
@@ -90,7 +91,7 @@ typedef struct
 #define csgo_increment_frames() \
 csgo_ctrl.ammo_frame++;\
 csgo_ctrl.health_frame++;\
-csgo_ctrl.bomb_tick_frame++;\
+csgo_ctrl.bomb_slot_frame++;\
 csgo_ctrl.bomb_overall_frame++;\
 csgo_ctrl.bomb_frame++;\
 csgo_ctrl.flash_frame++;\

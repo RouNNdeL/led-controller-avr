@@ -25,7 +25,7 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
             set_color(temp, 0, AMMO_COLOR_NORMAL);
             set_color(temp, 1, AMMO_COLOR_LOW);
             cross_fade(ammo_color, temp, 3, 0, (transition_ammo - AMMO_FADE_END) *
-                                               (uint32_t) UINT16_MAX / (AMMO_FADE_START - AMMO_FADE_END));
+                                               (uint16_t) UINT8_MAX / (AMMO_FADE_START - AMMO_FADE_END));
         }
         else
         {
@@ -70,7 +70,7 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
         uint16_t times[] = {0, BOMB_ANIMATION_TIME / 2, 0, BOMB_ANIMATION_TIME / 2, 0, 0};
         uint8_t args[] = {0, BOMB_ANIMATION_LOW, BOMB_ANIMATION_HIGH};
         uint8_t colors[] = {BOMB_SLOT_COLOR};
-        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->bomb_tick_frame, times, args, colors, 1, 1);
+        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->bomb_slot_frame, times, args, colors, 1, 1);
     }
     else if(state->weapon_slot)
     {
@@ -106,11 +106,11 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
     if(transition_health > HEALTH_MEDIUM_HEALTH)
     {
         cross_fade(pc, health_colors, 3, 0,
-                   (transition_health - HEALTH_MEDIUM_HEALTH) * (uint32_t) UINT16_MAX / (255 - HEALTH_MEDIUM_HEALTH));
+                   (transition_health - HEALTH_MEDIUM_HEALTH) * (uint16_t) UINT8_MAX / (255 - HEALTH_MEDIUM_HEALTH));
     }
     else
     {
-        cross_fade(pc, health_colors, 6, 3, transition_health * (uint32_t) UINT16_MAX / HEALTH_MEDIUM_HEALTH);
+        cross_fade(pc, health_colors, 6, 3, transition_health * (uint16_t) UINT8_MAX / HEALTH_MEDIUM_HEALTH);
     }
     //</editor-fold>
 
@@ -193,7 +193,7 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
             if(control->bomb_overall_frame >= 2440)
             {
                 uint8_t analog_base[9] = {pc[0], pc[1], pc[2], gpu[0], gpu[1], gpu[2], BOMB_TICK_COLOR};
-                uint16_t progress = control->bomb_frame * (uint32_t) UINT16_MAX / control->bomb_tick_rate * 2;
+                uint8_t progress = control->bomb_frame * (uint16_t) UINT8_MAX / control->bomb_tick_rate * 2;
                 cross_fade(pc, analog_base, 0, 6, progress);
                 cross_fade(gpu, analog_base, 3, 6, progress);
 
@@ -216,8 +216,8 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
             {
                 uint8_t analog_base[12] = {pc[0], pc[1], pc[2], gpu[0], gpu[1], gpu[2], BOMB_TICK_COLOR,
                                            BOMB_TICK_COLOR_BACKUP};
-                uint16_t progress = control->bomb_frame * (uint32_t) UINT16_MAX / control->bomb_tick_rate;
-                progress = (progress > INT16_MAX ? UINT16_MAX - progress : progress) * 2;
+                uint8_t progress = control->bomb_frame * (uint16_t) UINT8_MAX / control->bomb_tick_rate;
+                progress = (progress > INT8_MAX ? UINT8_MAX - progress : progress) * 2;
                 cross_fade(pc, analog_base, 0, is_black(pc) ? 9 : 6, progress);
                 cross_fade(gpu, analog_base, 3, is_black(gpu) ? 9 : 6, progress);
 
@@ -234,9 +234,9 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
         }
         else
         {
-            set_color(gpu, 0, COLOR_BLACK);
-            set_color(pc, 0, COLOR_BLACK);
-            set_all_colors(fan, COLOR_BLACK, FAN_LED_COUNT);
+            set_color(gpu, 0, BOMB_BEEP_COLOR);
+            set_color(pc, 0, BOMB_BEEP_COLOR);
+            set_all_colors(fan, BOMB_BEEP_COLOR, FAN_LED_COUNT);
         }
     }
 
@@ -277,11 +277,10 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
                                                 (old_state->flashed > state->flashed ? FLASH_TRANSITION_TIME_DOWN
                                                                                      : FLASH_TRANSITION_TIME_UP);
     }
-    uint16_t transition_progress = transition_flash * UINT8_MAX;
 
     uint8_t analog_base[9] = {pc[0], pc[1], pc[2], gpu[0], gpu[1], gpu[2], FLASH_COLOR};
-    if(!(avoid_black && is_black(pc))) cross_fade(pc, analog_base, 0, 6, transition_progress);
-    if(!(avoid_black && is_black(gpu))) cross_fade(gpu, analog_base, 3, 6, transition_progress);
+    if(!(avoid_black && is_black(pc))) cross_fade(pc, analog_base, 0, 6, transition_flash);
+    if(!(avoid_black && is_black(gpu))) cross_fade(gpu, analog_base, 3, 6, transition_flash);
 
     if(!(fan_black && avoid_black))
     {
@@ -293,15 +292,15 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
 
         for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
         {
-            cross_fade(fan + i * 3, fan_cpy, i * 3, FAN_LED_COUNT * 3, transition_progress);
+            cross_fade(fan + i * 3, fan_cpy, i * 3, FAN_LED_COUNT * 3, transition_flash);
         }
     }
     //</editor-fold>
 
     //<editor-fold desc="Variable resets">
-    if(control->bomb_tick_frame >= BOMB_ANIMATION_TIME)
+    if(control->bomb_slot_frame >= BOMB_ANIMATION_TIME)
     {
-        control->bomb_tick_frame = 0;
+        control->bomb_slot_frame = 0;
     }
     if(state->weapon_slot != old_state->weapon_slot)
     {

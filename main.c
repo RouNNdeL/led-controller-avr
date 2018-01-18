@@ -556,7 +556,7 @@ void process_uart()
                         old_csgo_state.weapon_slot = csgo_state.weapon_slot;
                         csgo_state.weapon_slot = new_state.weapon_slot;
                         csgo_ctrl.ammo_frame = 0;
-                        csgo_ctrl.bomb_tick_frame = 0;
+                        csgo_ctrl.bomb_slot_frame = 0;
                     }
                     if(new_state.bomb_state != csgo_state.bomb_state)
                     {
@@ -564,6 +564,7 @@ void process_uart()
                         csgo_state.bomb_state = new_state.bomb_state;
                         csgo_ctrl.bomb_overall_frame = 0;
                         csgo_ctrl.bomb_frame = 0;
+                        csgo_ctrl.bomb_tick_rate = BOMB_TICK_INIT;
                     }
                     //</editor-fold>
 
@@ -583,13 +584,6 @@ void process_uart()
                     if(csgo_state.health == 0)
                     {
                         csgo_ctrl.damage = csgo_ctrl.damage > DAMAGE_MIN_ON_DEATH ? csgo_ctrl.damage : DAMAGE_MIN_ON_DEATH;
-                    }
-
-                    if(csgo_state.bomb_state != old_csgo_state.bomb_state)
-                    {
-                        csgo_ctrl.bomb_frame = 0;
-                        csgo_ctrl.bomb_overall_frame = 0;
-                        csgo_ctrl.bomb_tick_rate = BOMB_TICK_INIT;
                     }
 
                     uart_transmit(RECEIVE_SUCCESS);
@@ -735,11 +729,7 @@ int main(void)
 #if (COMPILE_CSGO != 0)
             if(flags & FLAG_CSGO_ENABLED)
             {
-                //csgo_state.ammo = 255 - (frame % UINT8_MAX);
                 process_csgo(&csgo_ctrl, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf);
-
-                /*if(!(frame % 64))
-                    transmit_bytes((uint8_t *) &csgo_ctrl.bomb_overall_frame, 2);*/
 
                 csgo_increment_frames();
 
