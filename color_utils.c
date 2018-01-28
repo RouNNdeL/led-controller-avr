@@ -376,7 +376,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                 uint8_t index = (i + start_led) % led_count * 3;
 
                 uint8_t n_color_for_piece = n_color + 3 * (piece % args[ARG_FILL_COLOR_COUNT]);
-                set_color(leds, index, color_from_buf(colors + n_color_for_piece));
+                set_color_manual(leds+index, color_from_buf(colors + n_color_for_piece));
             }
             //</editor-fold>
         }
@@ -437,8 +437,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                             if(args[ARG_BIT_PACK] & FADE_SMOOTH)
                             {
                                 uint8_t faded[6];
-                                set_color(faded, 0, colors[n_color_for_piece],
-                                          colors[n_color_for_piece + 1], colors[n_color_for_piece + 2]);
+                                set_color_manual(faded, color_from_buf(colors+n_color_for_piece));
                                 cross_fade(faded + 3, colors, m_color_for_piece, n_color_for_piece,
                                            progress / UINT8_MAX);
                                 cross_fade(leds + index, faded, 3, 0, led_progress_current);
