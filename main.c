@@ -40,7 +40,7 @@ global_settings EEMEM globals_addr;
 global_settings globals;
 profile current_profile;
 uint16_t frames[6][6];
-uint16_t auto_increment;
+uint32_t auto_increment;
 
 #define fetch_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH)
 #define change_profile(n) eeprom_read_block(&current_profile, &profiles[n], PROFILE_LENGTH)
@@ -130,7 +130,8 @@ void convert_bufs()
     }
 }
 
-#if (COMPILE_EFFECTS !=0)
+#if (COMPILE_EFFECTS != 0)
+
 void apply_brightness()
 {
     for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
@@ -219,6 +220,40 @@ uint16_t time_to_frames(uint8_t time)
     return (60 * time - 14400) * FPS;
 }
 
+uint32_t autoincrement_to_frames(uint8_t time)
+{
+    if(time <= 60)
+    {
+        return time * FPS / 2;
+    }
+    if(time <= 90)
+    {
+        return (time - 30) * FPS;
+    }
+    if(time <= 126)
+    {
+        return (5 * time / 2 - 165) * FPS;
+    }
+    if(time <= 156)
+    {
+        return (5 * time - 480) * FPS;
+    }
+    if(time <= 196)
+    {
+        return (15 * time - 2040) * FPS;
+    }
+    if(time <= 211)
+    {
+        return (60 * time - 10860) * FPS;
+    }
+    if(time <= 253)
+    {
+        return (300 * time - 61500) * FPS;
+    }
+    if(time == 254) return 18000 * FPS;
+    return 21600 * FPS;
+}
+
 #pragma clang diagnostic pop
 
 void convert_to_frames(uint16_t *frames, uint8_t *times)
@@ -231,7 +266,8 @@ void convert_to_frames(uint16_t *frames, uint8_t *times)
     frames[5] = time_to_frames(times[5]);
 }
 
-#if (COMPILE_EFFECTS !=0)
+#if (COMPILE_EFFECTS != 0)
+
 void convert_all_frames()
 {
     for(uint8_t i = 0; i < 6; ++i)
@@ -239,6 +275,7 @@ void convert_all_frames()
         convert_to_frames(frames[i], current_profile.devices[i].timing);
     }
 }
+
 #endif /* (COMPILE_EFFECTS !=0) */
 
 void update()
@@ -290,25 +327,28 @@ void init_avr()
     set_color(gpu_buf, 0, 0, 0, 0);
 }
 
-#if (COMPILE_EFFECTS !=0)
+#if (COMPILE_EFFECTS != 0)
+
 void init_eeprom()
 {
     eeprom_read_block(&globals, &globals_addr, GLOBALS_LENGTH);
-    auto_increment = time_to_frames(globals.auto_increment) * AUTO_INCREMENT_MULTIPLIER;
+    auto_increment = autoincrement_to_frames(globals.auto_increment);
 
     change_profile(globals.n_profile);
     convert_all_frames();
 }
+
 #endif /* (COMPILE_EFFECTS !=0) */
 
 #if (COMPILE_UART != 0)
+
 void process_uart()
 {
     if(uart_control)
     {
         switch(uart_control)
         {
-#if  (COMPILE_EFFECTS !=0)
+#if  (COMPILE_EFFECTS != 0)
             case SAVE_PROFILE:
             {
                 //<editor-fold desc="Save profile">
@@ -387,7 +427,7 @@ void process_uart()
                         refresh_profile();
                         frame = 0;
                     }
-                    auto_increment = time_to_frames(globals.auto_increment) * AUTO_INCREMENT_MULTIPLIER;
+                    auto_increment = autoincrement_to_frames(globals.auto_increment);
 
                     uart_transmit(RECEIVE_SUCCESS);
 
@@ -583,7 +623,8 @@ void process_uart()
 
                     if(csgo_state.health == 0)
                     {
-                        csgo_ctrl.damage = csgo_ctrl.damage > DAMAGE_MIN_ON_DEATH ? csgo_ctrl.damage : DAMAGE_MIN_ON_DEATH;
+                        csgo_ctrl.damage =
+                                csgo_ctrl.damage > DAMAGE_MIN_ON_DEATH ? csgo_ctrl.damage : DAMAGE_MIN_ON_DEATH;
                     }
 
                     uart_transmit(RECEIVE_SUCCESS);
@@ -740,30 +781,30 @@ int main(void)
             {
 #endif /* (COMPILE_CSGO != 0) */
 #if (COMPILE_EFFECTS != 0)
-            if(globals.leds_enabled)
-            {
-                simple(pc_buf, DEVICE_PC);
-                simple(gpu_buf, DEVICE_GPU);
-
-                for(uint8_t i = 0; i < globals.fan_count; ++i)
+                if(globals.leds_enabled)
                 {
-                    digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
+                    simple(pc_buf, DEVICE_PC);
+                    simple(gpu_buf, DEVICE_GPU);
+
+                    for(uint8_t i = 0; i < globals.fan_count; ++i)
+                    {
+                        digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
+                    }
+
+                    /* Enable when the strip is installed */
+                    /*digital(strip_buf, STRIP_LED_COUNT, 0, DEVICE_STRIP);*/
+
+                    convert_bufs();
+                    apply_brightness();
                 }
+                else
+                {
+                    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
+                    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
 
-                /* Enable when the strip is installed */
-                /*digital(strip_buf, STRIP_LED_COUNT, 0, DEVICE_STRIP);*/
-
-                convert_bufs();
-                apply_brightness();
-            }
-            else
-            {
-                set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
-                set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
-
-                set_color(pc_buf, 0, 0, 0, 0);
-                set_color(gpu_buf, 0, 0, 0, 0);
-            }
+                    set_color(pc_buf, 0, 0, 0, 0);
+                    set_color(gpu_buf, 0, 0, 0, 0);
+                }
 #endif /* (COMPILE_EFFECTS != 0) */
 #if (COMPILE_CSGO != 0)
             }
@@ -793,6 +834,7 @@ ISR(TIMER3_COMPA_vect)
 }
 
 #if (COMPILE_UART != 0)
+
 ISR(USART0_RX_vect)
 {
     uint8_t val = UDR0;
@@ -810,4 +852,5 @@ ISR(USART0_RX_vect)
         uart_transmit(BUFFER_OVERFLOW);
     }
 }
+
 #endif /* (COMPILE_UART != 0) */
