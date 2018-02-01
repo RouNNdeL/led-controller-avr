@@ -114,7 +114,7 @@ void convert_bufs()
         fan_buf[index] = temp;
     }
 
-    for(uint8_t i = 0; i < STRIP_LED_COUNT; ++i)
+    for(uint8_t i = 0; i < STRIP_LED_COUNT + 1; ++i)
     {
         uint16_t index = i * 3;
 
@@ -303,7 +303,7 @@ void init_avr()
     /* Initialize timer3 for time measurement */
     TCCR3B |= (1 << WGM32);  /* Set timer3 to CTC mode */
     TIMSK3 |= (1 << OCIE3A); /* Enable timer3 clear interrupt */
-    OCR3A = 31250;           /* Set timer3 A register to reset every 1/64s */
+    OCR3A = 40000;           /* Set timer3 A register to reset every 1/50s */
     TCCR3B |= (1 << CS31);   /* Set the timer3 prescaler to 8 */
 
     /* Initialize timer0 for PWM */
@@ -792,7 +792,9 @@ int main(void)
                     }
 
                     /* Enable when the strip is installed */
-                    /*digital(strip_buf, STRIP_LED_COUNT, 0, DEVICE_STRIP);*/
+                    //digital(strip_buf+3, STRIP_LED_COUNT, 0, DEVICE_STRIP);
+
+                    digital(strip_buf+3, STRIP_LED_COUNT, 0, DEVICE_STRIP);
 
                     convert_bufs();
                     apply_brightness();
