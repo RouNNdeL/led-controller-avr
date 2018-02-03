@@ -71,7 +71,8 @@ uint8_t uart_flags = 0;
 //<editor-fold desc="Hardware">
 
 uint8_t fan_buf[FAN_LED_COUNT * MAX_FAN_COUNT * 3];
-uint8_t strip_buf[(STRIP_LED_COUNT + 1) * 3];
+uint8_t strip_buf_full[(STRIP_LED_COUNT + 1) * 3];
+uint8_t *strip_buf = strip_buf_full + 3;
 uint8_t pc_buf[3];
 uint8_t gpu_buf[3];
 
@@ -119,14 +120,14 @@ void convert_bufs()
         uint16_t index = i * 3;
 
 #if (ACTUAL_BRIGHTNESS_DIGITAL != 0)
-        strip_buf[index] = actual_brightness(strip_buf[index]);
-        strip_buf[index + 1] = actual_brightness(strip_buf[index + 1]);
-        strip_buf[index + 2] = actual_brightness(strip_buf[index + 2]);
+        strip_buf_full[index] = actual_brightness(strip_buf_full[index]);
+        strip_buf_full[index + 1] = actual_brightness(strip_buf_full[index + 1]);
+        strip_buf_full[index + 2] = actual_brightness(strip_buf_full[index + 2]);
 #endif /* #if (ACTUAL_BRIGHTNESS_DIGITAL != 0) */
 
-        uint8_t temp = strip_buf[index + 1];
-        strip_buf[index + 1] = strip_buf[index];
-        strip_buf[index] = temp;
+        uint8_t temp = strip_buf_full[index + 1];
+        strip_buf_full[index + 1] = strip_buf_full[index];
+        strip_buf_full[index] = temp;
     }
 }
 
@@ -147,9 +148,9 @@ void apply_brightness()
     {
         uint16_t index = i * 3;
 
-        strip_buf[index] = brightness(strip_buf[index]);
-        strip_buf[index + 1] = brightness(strip_buf[index + 1]);
-        strip_buf[index + 2] = brightness(strip_buf[index + 2]);
+        strip_buf_full[index] = brightness(strip_buf_full[index]);
+        strip_buf_full[index + 1] = brightness(strip_buf_full[index + 1]);
+        strip_buf_full[index + 2] = brightness(strip_buf_full[index + 2]);
     }
 
     pc_buf[0] = brightness(pc_buf[0]);
@@ -281,7 +282,7 @@ void convert_all_frames()
 void update()
 {
     output_grb_fan(fan_buf, sizeof(fan_buf));
-    output_grb_strip(strip_buf, sizeof(strip_buf));
+    output_grb_strip(strip_buf_full, sizeof(strip_buf_full));
 
     output_pc(pc_buf);
     output_gpu(gpu_buf);
@@ -320,7 +321,7 @@ void init_avr()
 
     sei();                   /* Enable global interrupts */
 
-    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
+    set_all_colors(strip_buf_full, 0, 0, 0, STRIP_LED_COUNT + 1);
     set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
 
     set_color(pc_buf, 0, 0, 0, 0);
@@ -792,10 +793,109 @@ int main(void)
                         digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
                     }
 
-                    /* Enable when the strip is installed */
-                    //digital(strip_buf+3, STRIP_LED_COUNT, 0, DEVICE_STRIP);
+                    //<editor-fold desc="Strip calculations and transformations">
+                    if(current_profile.flags & PROFILE_FLAG_FRONT_PC)
+                    {
+                        //<editor-fold desc="Front as PC">
+                        set_all_colors(strip_buf + STRIP_SIDE_LED_COUNT * 6, color_from_buf(pc_buf),
+                                       STRIP_FRONT_LED_COUNT);
+                        if(current_profile.flags & PROFILE_FLAG_STRIP_MODE)
+                        {
+                            digital(strip_buf, STRIP_SIDE_LED_COUNT * 2, 0, DEVICE_STRIP);
+                        }
+                        else
+                        {
+                            digital(strip_buf, STRIP_SIDE_LED_COUNT, 0, DEVICE_STRIP);
+                            for(uint8_t i = 0; i < STRIP_SIDE_LED_COUNT; ++i)
+                            {
+                                uint8_t index = i * 3;
+                                strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 3] = strip_buf[index];
+                                strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 2] = strip_buf[index + 1];
+                                strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 1] = strip_buf[index + 2];
+                            }
+                        }
+                        //</editor-fold>
+                    }
+                    else
+                    {
+                        if(current_profile.flags & PROFILE_FLAG_STRIP_MODE)
+                        {
+                            //<editor-fold desc="Loop">
+                            digital(strip_buf, STRIP_LED_COUNT, 0, DEVICE_STRIP);
 
-                    digital(strip_buf+3, STRIP_LED_COUNT, 0, DEVICE_STRIP);
+                            /* This shifts the second side of the strip forward by STRIP_FRONT_LED_COUNT */
+                            uint8_t front[STRIP_FRONT_LED_COUNT * 3];
+                            memcpy(front, strip_buf + STRIP_SIDE_LED_COUNT * 3, STRIP_FRONT_LED_COUNT * 3);
+                            memmove(strip_buf + STRIP_SIDE_LED_COUNT * 3, strip_buf +
+                                                                          (STRIP_SIDE_LED_COUNT +
+                                                                           STRIP_FRONT_LED_COUNT) * 3,
+                                    STRIP_SIDE_LED_COUNT * 3);
+
+                            uint8_t i = STRIP_FRONT_LED_COUNT - 1;
+                            uint8_t j = 0;
+                            while(i > j)
+                            {
+                                uint8_t index = i * 3;
+                                uint8_t index2 = j * 3;
+                                uint8_t r = front[index];
+                                uint8_t g = front[index + 1];
+                                uint8_t b = front[index + 2];
+                                front[index] = front[index2];
+                                front[index + 1] = front[index2 + 1];
+                                front[index + 2] = front[index2 + 2];
+                                front[index2] = r;
+                                front[index2 + 1] = g;
+                                front[index2 + 2] = b;
+                                i--;
+                                j++;
+                            }
+
+                            memcpy(strip_buf + STRIP_SIDE_LED_COUNT * 6, front, STRIP_FRONT_LED_COUNT * 3);
+                            //</editor-fold>
+                        }
+                        else
+                        {
+                            //<editor-fold desc="Single strip">
+                            if(current_profile.flags & PROFILE_FLAG_FRONT_MODE)
+                            {
+                                digital(strip_buf, STRIP_SIDE_LED_COUNT + 1, 0, DEVICE_STRIP);
+                                set_all_colors(strip_buf + STRIP_SIDE_LED_COUNT * 6,
+                                               color_from_buf(strip_buf + STRIP_SIDE_LED_COUNT * 3),
+                                               STRIP_FRONT_LED_COUNT);
+                            }
+                            else
+                            {
+                                uint8_t front_half = (STRIP_FRONT_LED_COUNT + 1) / 2;
+                                digital(strip_buf, STRIP_SIDE_LED_COUNT + front_half, 0, DEVICE_STRIP);
+                                for(uint8_t i = 0; i < front_half; ++i)
+                                {
+                                    uint8_t index = i * 3;
+                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 + index] =
+                                            strip_buf[STRIP_SIDE_LED_COUNT * 3 + index];
+                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 + index + 1] =
+                                            strip_buf[STRIP_SIDE_LED_COUNT * 3 + index + 1];
+                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 + index + 2] =
+                                            strip_buf[STRIP_SIDE_LED_COUNT * 3 + index + 2];
+
+                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 + STRIP_FRONT_LED_COUNT * 3 - index - 3] =
+                                            strip_buf[STRIP_SIDE_LED_COUNT * 3 + index];
+                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 + STRIP_FRONT_LED_COUNT * 3 - index - 2] =
+                                            strip_buf[STRIP_SIDE_LED_COUNT * 3 + index + 1];
+                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 + STRIP_FRONT_LED_COUNT * 3 - index - 1] =
+                                            strip_buf[STRIP_SIDE_LED_COUNT * 3 + index + 2];
+                                }
+                            }
+                            for(uint8_t i = 0; i < STRIP_SIDE_LED_COUNT; ++i)
+                            {
+                                uint8_t index = i * 3;
+                                strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 3] = strip_buf[index];
+                                strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 2] = strip_buf[index + 1];
+                                strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 1] = strip_buf[index + 2];
+                            }
+                            //</editor-fold>
+                        }
+                    }
+                    //</editor-fold>
 
                     convert_bufs();
                     apply_brightness();
@@ -803,7 +903,7 @@ int main(void)
                 else
                 {
                     set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
-                    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT + 1);
+                    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT);
 
                     set_color(pc_buf, 0, 0, 0, 0);
                     set_color(gpu_buf, 0, 0, 0, 0);

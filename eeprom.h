@@ -21,6 +21,7 @@ typedef struct
 typedef struct
 {
     device_profile devices[6];
+    uint8_t flags;
 } __attribute__((packed)) profile;
 
 typedef struct
@@ -38,6 +39,22 @@ typedef struct
 #define GLOBALS_LENGTH sizeof(global_settings)
 #define DEVICE_LENGTH sizeof(device_profile)
 #define PROFILE_LENGTH sizeof(profile)
+
+/**
+ * When set to 1 the strip functions like a loop, otherwise both sides function like one strip
+ */
+#define PROFILE_FLAG_STRIP_MODE (1 << 0)
+
+/**
+ * When set to 1 the front functions as the last led of the strip, otherwise it wraps to front
+ * (only applies when <code>PROFILE_FLAG_STRIP_MODE</code> is set to single strip mode)
+ */
+#define PROFILE_FLAG_FRONT_MODE (1 << 1)
+
+/** When set to 1 the front is set to function like the pc_buf, otherwise it is the part of the bottom strip
+ * and it behaviour depends on PROFILE_FLAG_FRONT_MODE
+ */
+#define PROFILE_FLAG_FRONT_PC (1 << 2)
 
 #define DEVICE_PC 0
 #define DEVICE_GPU 1
