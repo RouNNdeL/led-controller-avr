@@ -724,6 +724,7 @@ int main(void)
         if(flags & FLAG_NEW_FRAME)
         {
             flags &= ~FLAG_NEW_FRAME;
+            update();
 
 #if (COMPILE_EFFECTS != 0)
             if(auto_increment && frame && frame % auto_increment == 0 && globals.leds_enabled)
@@ -832,7 +833,6 @@ ISR(TIMER3_COMPA_vect)
 {
     frame++;
     flags |= FLAG_NEW_FRAME;
-    update();
 }
 
 #if (COMPILE_UART != 0)
