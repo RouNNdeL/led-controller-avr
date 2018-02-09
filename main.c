@@ -437,6 +437,39 @@ void process_uart()
                 //</editor-fold>
                 break;
             }
+            case SAVE_PROFILE_FLAGS:
+            {
+                //<editor-fold desc="Save profile flags">
+                if(!(uart_flags & UART_FLAG_RECEIVE))
+                {
+                    uart_transmit(READY_TO_RECEIVE);
+                    uart_flags |= UART_FLAG_RECEIVE;
+                }
+                else if(uart_buffer_length >= 2)
+                {
+
+                    if(globals.profile_order[globals.n_profile] == uart_buffer[0])
+                    {
+                        current_profile.flags = uart_buffer[1];
+                        flags |= FLAG_PROFILE_UPDATED;
+                    }
+                    else
+                    {
+                        profile received;
+                        fetch_profile(received, uart_buffer[0]);
+
+                        received.flags = uart_buffer[1];
+
+                        save_profile(received, uart_buffer[0]);
+                    }
+
+                    uart_transmit(RECEIVE_SUCCESS);
+
+                    reset_uart();
+                }
+                //</editor-fold>
+                break;
+            }
             case SEND_PROFILE:
             {
                 if(!(uart_flags & UART_FLAG_RECEIVE))

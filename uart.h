@@ -7,6 +7,7 @@
 #define SAVE_PROFILE 0x11
 #define TEMP_DEVICE 0x12
 #define SAVE_EXPLICIT 0x13
+#define SAVE_PROFILE_FLAGS 0x14
 
 #define SEND_GLOBALS 0x20
 #define SEND_PROFILE 0x21
