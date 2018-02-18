@@ -50,7 +50,7 @@ uint32_t auto_increment;
 #define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count
 #define refresh_profile() change_profile(globals.profile_order[globals.n_profile]); convert_all_frames()
 
-#define brightness(color) (color * globals.brightness) / UINT8_MAX
+#define brightness(device, color) (color * globals.brightness[device]) / UINT8_MAX
 #endif /* (COMPILE_EFFECTS != 0) */
 //</editor-fold>
 
@@ -135,31 +135,34 @@ void convert_bufs()
 
 void apply_brightness()
 {
-    for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
+    for(int i = 0; i < globals.fan_count; ++i)
     {
-        uint8_t index = i * 3;
+        for(uint8_t j = 0; j < FAN_LED_COUNT; ++j)
+        {
+            uint8_t index = j * 3;
 
-        fan_buf[index] = brightness(fan_buf[index]);
-        fan_buf[index + 1] = brightness(fan_buf[index + 1]);
-        fan_buf[index + 2] = brightness(fan_buf[index + 2]);
+            fan_buf[index] = brightness(DEVICE_FAN + i, fan_buf[index]);
+            fan_buf[index + 1] = brightness(DEVICE_FAN + i, fan_buf[index + 1]);
+            fan_buf[index + 2] = brightness(DEVICE_FAN + i, fan_buf[index + 2]);
+        }
     }
 
     for(uint8_t i = 0; i < STRIP_LED_COUNT; ++i)
     {
         uint16_t index = i * 3;
 
-        strip_buf_full[index] = brightness(strip_buf_full[index]);
-        strip_buf_full[index + 1] = brightness(strip_buf_full[index + 1]);
-        strip_buf_full[index + 2] = brightness(strip_buf_full[index + 2]);
+        strip_buf_full[index] = brightness(DEVICE_STRIP, strip_buf_full[index]);
+        strip_buf_full[index + 1] = brightness(DEVICE_STRIP, strip_buf_full[index + 1]);
+        strip_buf_full[index + 2] = brightness(DEVICE_STRIP, strip_buf_full[index + 2]);
     }
 
-    pc_buf[0] = brightness(pc_buf[0]);
-    pc_buf[1] = brightness(pc_buf[1]);
-    pc_buf[2] = brightness(pc_buf[2]);
+    pc_buf[0] = brightness(DEVICE_PC, pc_buf[0]);
+    pc_buf[1] = brightness(DEVICE_PC, pc_buf[1]);
+    pc_buf[2] = brightness(DEVICE_PC, pc_buf[2]);
 
-    gpu_buf[0] = brightness(gpu_buf[0]);
-    gpu_buf[1] = brightness(gpu_buf[1]);
-    gpu_buf[2] = brightness(gpu_buf[2]);
+    gpu_buf[0] = brightness(DEVICE_GPU, gpu_buf[0]);
+    gpu_buf[1] = brightness(DEVICE_GPU, gpu_buf[1]);
+    gpu_buf[2] = brightness(DEVICE_GPU, gpu_buf[2]);
 }
 
 #pragma clang diagnostic push
@@ -805,7 +808,8 @@ int main(void)
 #if (COMPILE_CSGO != 0)
             if(flags & FLAG_CSGO_ENABLED)
             {
-                process_csgo(&csgo_ctrl, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf, strip_buf);
+                process_csgo(&csgo_ctrl, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf,
+                             strip_buf);
 
                 csgo_increment_frames();
 

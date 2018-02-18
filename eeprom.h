@@ -26,7 +26,7 @@ typedef struct
 
 typedef struct
 {
-    uint8_t brightness;
+    uint8_t brightness[6];
     uint8_t profile_count;
     uint8_t n_profile;
     uint8_t leds_enabled;
