@@ -103,6 +103,6 @@ csgo_ctrl.round_state_frame++
 #define CSGO_STATE_LENGTH sizeof(game_state)
 
 void process_csgo(csgo_control *control, game_state *state, game_state *old_state, uint8_t *fan, uint8_t fan_start_led,
-                  uint8_t *gpu, uint8_t *pc);
+                  uint8_t *gpu, uint8_t *pc, uint8_t *strip);
 
 #endif //LEDCONTROLLER_CSGO_H

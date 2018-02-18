@@ -805,7 +805,7 @@ int main(void)
 #if (COMPILE_CSGO != 0)
             if(flags & FLAG_CSGO_ENABLED)
             {
-                process_csgo(&csgo_ctrl, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf);
+                process_csgo(&csgo_ctrl, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf, strip_buf);
 
                 csgo_increment_frames();
 

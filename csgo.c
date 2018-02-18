@@ -4,7 +4,7 @@
 #include "eeprom.h"
 
 void process_csgo(csgo_control *control, game_state *state, game_state *old_state, uint8_t *fan, uint8_t fan_start_led,
-                  uint8_t *gpu, uint8_t *pc)
+                  uint8_t *gpu, uint8_t *pc, uint8_t *strip)
 {
     //<editor-fold desc="Ammunition on CPU fan">
     /* Number from 0-255*led_count, used to make the effect smooth */
@@ -295,6 +295,11 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
             cross_fade(fan + i * 3, fan_cpy, i * 3, FAN_LED_COUNT * 3, transition_flash);
         }
     }
+    //</editor-fold>
+
+    //<editor-fold desc="Underglow">
+    //TODO: Add proper support
+    set_all_colors(strip, color_from_buf(pc), STRIP_LED_COUNT);
     //</editor-fold>
 
     //<editor-fold desc="Variable resets">
