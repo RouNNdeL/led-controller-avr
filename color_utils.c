@@ -504,6 +504,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
     }
     else if(effect != PARTICLES)
     {
+        //TODO: Change ROTATING effect to use empty space arg instead of piece count (will improve handling in uneven LED count)
         //<editor-fold desc="PIECES, ROTATING">
         uint16_t sum = times[TIME_ON] + times[TIME_FADEOUT];
         uint32_t d_time = frame % sum;
