@@ -71,7 +71,7 @@ uint8_t uart_flags = 0;
 //<editor-fold desc="Hardware">
 
 uint8_t fan_buf[FAN_LED_COUNT * MAX_FAN_COUNT * 3];
-uint8_t strip_buf_full[(STRIP_LED_COUNT + 1) * 3];
+uint8_t strip_buf_full[(STRIP_VIRTUAL_COUNT + 1) * 3];
 uint8_t *strip_buf = strip_buf_full + 3;
 uint8_t pc_buf[3];
 uint8_t gpu_buf[3];
@@ -284,8 +284,8 @@ void convert_all_frames()
 
 void update()
 {
-    output_grb_fan(fan_buf, sizeof(fan_buf));
-    output_grb_strip(strip_buf_full, sizeof(strip_buf_full));
+    output_grb_fan(fan_buf, FAN_LED_COUNT * 3 * globals.fan_count);
+    output_grb_strip(strip_buf_full, STRIP_LED_COUNT * 3 + 3);
 
     output_pc(pc_buf);
     output_gpu(gpu_buf);
@@ -829,7 +829,7 @@ int main(void)
                     {
                         digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
                     }
-
+                    
                     //<editor-fold desc="Strip calculations and transformations">
                     if(current_profile.flags & PROFILE_FLAG_FRONT_PC)
                     {
@@ -858,33 +858,31 @@ int main(void)
                         if(current_profile.flags & PROFILE_FLAG_STRIP_MODE)
                         {
                             //<editor-fold desc="Loop">
-                            uint8_t virtual_strip[STRIP_FRONT_VIRTUAL_COUNT * 3];
-                            digital(virtual_strip, STRIP_VIRTUAL_COUNT, 0, DEVICE_STRIP);
+                            digital(strip_buf, STRIP_VIRTUAL_COUNT, 0, DEVICE_STRIP);
 
                             uint8_t front_virtual[STRIP_VIRTUAL_COUNT * 3];
-                            memcpy(strip_buf, virtual_strip, STRIP_SIDE_LED_COUNT * 3);
                             /* This shifts the second side of the strip forward by STRIP_FRONT_LED_COUNT */
                             memcpy(front_virtual, strip_buf + STRIP_SIDE_LED_COUNT * 3, STRIP_VIRTUAL_COUNT * 3);
                             memmove(strip_buf + STRIP_SIDE_LED_COUNT * 3,
-                                    virtual_strip + (STRIP_SIDE_LED_COUNT + STRIP_VIRTUAL_COUNT) * 3,
+                                    strip_buf + (STRIP_SIDE_LED_COUNT + STRIP_FRONT_VIRTUAL_COUNT) * 3,
                                     STRIP_SIDE_LED_COUNT * 3);
 
-                            uint8_t front[STRIP_LED_COUNT * 3];
-                            for(uint8_t i = 0; i < STRIP_LED_COUNT / 2; ++i)
+                            uint8_t front[STRIP_FRONT_LED_COUNT * 3];
+                            for(uint8_t i = 0; i < STRIP_FRONT_LED_COUNT / 2; ++i)
                             {
                                 uint8_t index = i * 3;
-                                front[index] = virtual_strip[index * 2];
+                                set_color_manual(front+index, color_from_buf(front_virtual+index*2));
                             }
 
-                            uint8_t front_half = STRIP_LED_COUNT / 2 * 3;
-                            front[front_half] = (virtual_strip[front_half * 2] + virtual_strip[front_half * 2 + 3]) / 2;
-                            front[front_half + 1] = (virtual_strip[front_half * 2 + 1] + virtual_strip[front_half * 2 + 4]) / 2;
-                            front[front_half + 2] = (virtual_strip[front_half * 2 + 2] + virtual_strip[front_half * 2 + 5]) / 2;
+                            uint8_t front_half = STRIP_FRONT_LED_COUNT / 2 * 3;
+                            front[front_half] = (front_virtual[front_half * 2] + front_virtual[front_half * 2 - 3]) / 2;
+                            front[front_half + 1] = (front_virtual[front_half * 2 + 1] + front_virtual[front_half * 2 - 2]) / 2;
+                            front[front_half + 2] = (front_virtual[front_half * 2 + 2] + front_virtual[front_half * 2 - 1]) / 2;
 
-                            for(uint8_t i = front_half + 1; i < STRIP_LED_COUNT; ++i)
+                            for(uint8_t i = STRIP_FRONT_LED_COUNT / 2 + 1; i < STRIP_FRONT_LED_COUNT; ++i)
                             {
                                 uint8_t index = i * 3;
-                                front[index] = virtual_strip[index * 2 + 1];
+                                set_color_manual(front+index, color_from_buf(front_virtual+index*2-3));
                             }
 
                             uint8_t i = STRIP_FRONT_LED_COUNT - 1;
@@ -914,9 +912,9 @@ int main(void)
                             //<editor-fold desc="Single strip">
                             if(current_profile.flags & PROFILE_FLAG_FRONT_MODE)
                             {
-                                digital(strip_buf, STRIP_SIDE_LED_COUNT + 1, 0, DEVICE_STRIP);
+                                digital(strip_buf, STRIP_SIDE_LED_COUNT, 0, DEVICE_STRIP);
                                 set_all_colors(strip_buf + STRIP_SIDE_LED_COUNT * 6,
-                                               color_from_buf(strip_buf + STRIP_SIDE_LED_COUNT * 3),
+                                               color_from_buf(strip_buf + STRIP_SIDE_LED_COUNT * 3 - 3),
                                                STRIP_FRONT_LED_COUNT);
                             }
                             else
