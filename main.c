@@ -858,15 +858,34 @@ int main(void)
                         if(current_profile.flags & PROFILE_FLAG_STRIP_MODE)
                         {
                             //<editor-fold desc="Loop">
-                            digital(strip_buf, STRIP_LED_COUNT, 0, DEVICE_STRIP);
+                            uint8_t virtual_strip[STRIP_FRONT_VIRTUAL_COUNT * 3];
+                            digital(virtual_strip, STRIP_VIRTUAL_COUNT, 0, DEVICE_STRIP);
 
+                            uint8_t front_virtual[STRIP_VIRTUAL_COUNT * 3];
+                            memcpy(strip_buf, virtual_strip, STRIP_SIDE_LED_COUNT * 3);
                             /* This shifts the second side of the strip forward by STRIP_FRONT_LED_COUNT */
-                            uint8_t front[STRIP_FRONT_LED_COUNT * 3];
-                            memcpy(front, strip_buf + STRIP_SIDE_LED_COUNT * 3, STRIP_FRONT_LED_COUNT * 3);
-                            memmove(strip_buf + STRIP_SIDE_LED_COUNT * 3, strip_buf +
-                                                                          (STRIP_SIDE_LED_COUNT +
-                                                                           STRIP_FRONT_LED_COUNT) * 3,
+                            memcpy(front_virtual, strip_buf + STRIP_SIDE_LED_COUNT * 3, STRIP_VIRTUAL_COUNT * 3);
+                            memmove(strip_buf + STRIP_SIDE_LED_COUNT * 3,
+                                    virtual_strip + (STRIP_SIDE_LED_COUNT + STRIP_VIRTUAL_COUNT) * 3,
                                     STRIP_SIDE_LED_COUNT * 3);
+
+                            uint8_t front[STRIP_LED_COUNT * 3];
+                            for(uint8_t i = 0; i < STRIP_LED_COUNT / 2; ++i)
+                            {
+                                uint8_t index = i * 3;
+                                front[index] = virtual_strip[index * 2];
+                            }
+
+                            uint8_t front_half = STRIP_LED_COUNT / 2 * 3;
+                            front[front_half] = (virtual_strip[front_half * 2] + virtual_strip[front_half * 2 + 3]) / 2;
+                            front[front_half + 1] = (virtual_strip[front_half * 2 + 1] + virtual_strip[front_half * 2 + 4]) / 2;
+                            front[front_half + 2] = (virtual_strip[front_half * 2 + 2] + virtual_strip[front_half * 2 + 5]) / 2;
+
+                            for(uint8_t i = front_half + 1; i < STRIP_LED_COUNT; ++i)
+                            {
+                                uint8_t index = i * 3;
+                                front[index] = virtual_strip[index * 2 + 1];
+                            }
 
                             uint8_t i = STRIP_FRONT_LED_COUNT - 1;
                             uint8_t j = 0;
