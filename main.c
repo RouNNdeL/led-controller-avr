@@ -338,7 +338,7 @@ void init_eeprom()
     eeprom_read_block(&globals, &globals_addr, GLOBALS_LENGTH);
     auto_increment = autoincrement_to_frames(globals.auto_increment);
 
-    change_profile(globals.n_profile);
+    change_profile(globals.profile_order[globals.n_profile]);
     convert_all_frames();
 }
 
@@ -829,7 +829,7 @@ int main(void)
                     {
                         digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
                     }
-                    
+
                     //<editor-fold desc="Strip calculations and transformations">
                     if(current_profile.flags & PROFILE_FLAG_FRONT_PC)
                     {
