@@ -40,6 +40,8 @@ global_settings EEMEM globals_addr;
 global_settings globals;
 profile current_profile;
 uint16_t frames[6][6];
+uint8_t colors[6][PROFILE_COLOR_COUNT * 3];
+uint8_t backup_args[6][5];
 uint32_t auto_increment;
 
 #define fetch_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH)
@@ -48,7 +50,8 @@ uint32_t auto_increment;
 #define save_globals() eeprom_update_block(&globals, &globals_addr, GLOBALS_LENGTH)
 
 #define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count
-#define refresh_profile() change_profile(globals.profile_order[globals.n_profile]); convert_all_frames()
+#define refresh_profile() change_profile(globals.profile_order[globals.n_profile]); convert_all_frames();\
+backup_all_args(); convert_all_colors()
 
 #define brightness(device, color) (color * globals.brightness[device]) / UINT8_MAX
 #endif /* (COMPILE_EFFECTS != 0) */
@@ -80,10 +83,10 @@ uint8_t gpu_buf[3];
 #define output_gpu(color) output_analog2(color[2], color[1], color[0])
 
 #define simple(buf, n) simple_effect(current_profile.devices[n].effect, buf, frame + frames[n][TIME_DELAY], frames[n],\
-current_profile.devices[n].args, current_profile.devices[n].colors, current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
+current_profile.devices[n].args, colors[n], current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
 
 #define digital(buf, count, offset, n) digital_effect(current_profile.devices[n].effect, buf, count, offset, frame + frames[n][TIME_DELAY], frames[n],\
-current_profile.devices[n].args, current_profile.devices[n].colors, current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
+current_profile.devices[n].args, colors[n], current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
 //</editor-fold>
 
 #if (COMPILE_CSGO != 0)
@@ -96,6 +99,39 @@ volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run 
 #if (COMPILE_DEMOS != 0)
 uint8_t demo = 0;
 #endif /* (COMPILE_DEMOS != 0) */
+
+void backup_all_args()
+{
+    for(uint8_t i = 0; i < 6; ++i)
+    {
+        memcpy(backup_args[i], current_profile.devices[i].args, 5);
+    }
+}
+
+void convert_colors_for_brightness(uint8_t device)
+{
+    for(uint8_t j = 0; j < PROFILE_COLOR_COUNT; ++j)
+    {
+        uint8_t index = j * 3;
+        set_color_manual(colors[device] + index,
+                         color_brightness(globals.brightness[device],
+                                          color_from_buf(current_profile.devices[device].colors + index)));
+    }
+
+    if(current_profile.devices[device].effect == RAINBOW)
+    {
+        current_profile.devices[device].args[ARG_RAINBOW_BRIGHTNESS] =
+                brightness(device, backup_args[device][ARG_RAINBOW_BRIGHTNESS]);
+    }
+}
+
+void convert_all_colors()
+{
+    for(uint8_t i = 0; i < 6; ++i)
+    {
+        convert_colors_for_brightness(i);
+    }
+}
 
 void convert_bufs()
 {
@@ -130,44 +166,6 @@ void convert_bufs()
         strip_buf_full[index] = temp;
     }
 }
-
-#if (COMPILE_EFFECTS != 0)
-
-void apply_brightness()
-{
-    for(int i = 0; i < globals.fan_count; ++i)
-    {
-        for(uint8_t j = 0; j < FAN_LED_COUNT; ++j)
-        {
-            uint8_t index = j * 3;
-
-            fan_buf[index] = brightness(DEVICE_FAN + i, fan_buf[index]);
-            fan_buf[index + 1] = brightness(DEVICE_FAN + i, fan_buf[index + 1]);
-            fan_buf[index + 2] = brightness(DEVICE_FAN + i, fan_buf[index + 2]);
-        }
-    }
-
-    for(uint8_t i = 0; i < STRIP_LED_COUNT; ++i)
-    {
-        uint16_t index = i * 3;
-
-        strip_buf_full[index] = brightness(DEVICE_STRIP, strip_buf_full[index]);
-        strip_buf_full[index + 1] = brightness(DEVICE_STRIP, strip_buf_full[index + 1]);
-        strip_buf_full[index + 2] = brightness(DEVICE_STRIP, strip_buf_full[index + 2]);
-    }
-
-    pc_buf[0] = brightness(DEVICE_PC, pc_buf[0]);
-    pc_buf[1] = brightness(DEVICE_PC, pc_buf[1]);
-    pc_buf[2] = brightness(DEVICE_PC, pc_buf[2]);
-
-    gpu_buf[0] = brightness(DEVICE_GPU, gpu_buf[0]);
-    gpu_buf[1] = brightness(DEVICE_GPU, gpu_buf[1]);
-    gpu_buf[2] = brightness(DEVICE_GPU, gpu_buf[2]);
-}
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wsign-conversion"
-#endif /* (COMPILE_EFFECTS !=0) */
 
 void output_analog1(uint8_t q1, uint8_t q2, uint8_t q3)
 {
@@ -338,8 +336,7 @@ void init_eeprom()
     eeprom_read_block(&globals, &globals_addr, GLOBALS_LENGTH);
     auto_increment = autoincrement_to_frames(globals.auto_increment);
 
-    change_profile(globals.profile_order[globals.n_profile]);
-    convert_all_frames();
+    refresh_profile();
 }
 
 #endif /* (COMPILE_EFFECTS !=0) */
@@ -377,6 +374,7 @@ void process_uart()
                                    DEVICE_LENGTH);
                             uart_flags &= ~UART_FLAG_LOCK;
                             convert_to_frames(frames[uart_buffer[1]], current_profile.devices[uart_buffer[1]].timing);
+                            convert_colors_for_brightness(uart_buffer[1]);
 
                             flags |= FLAG_PROFILE_UPDATED;
                         }
@@ -432,6 +430,7 @@ void process_uart()
                         frame = 0;
                     }
                     auto_increment = autoincrement_to_frames(globals.auto_increment);
+                    convert_all_colors();
 
                     uart_transmit(RECEIVE_SUCCESS);
 
@@ -814,7 +813,6 @@ int main(void)
                 csgo_increment_frames();
 
                 convert_bufs();
-                apply_brightness();
             }
             else
             {
@@ -822,12 +820,21 @@ int main(void)
 #if (COMPILE_EFFECTS != 0)
                 if(globals.leds_enabled)
                 {
-                    simple(pc_buf, DEVICE_PC);
-                    simple(gpu_buf, DEVICE_GPU);
+                    if(globals.brightness[DEVICE_PC])
+                    {
+                        simple(pc_buf, DEVICE_PC);
+                    }
+                    if(globals.brightness[DEVICE_GPU])
+                    {
+                        simple(gpu_buf, DEVICE_GPU);
+                    }
 
                     for(uint8_t i = 0; i < globals.fan_count; ++i)
                     {
-                        digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
+                        if(globals.brightness[DEVICE_FAN + i])
+                        {
+                            digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
+                        }
                     }
 
                     //<editor-fold desc="Strip calculations and transformations">
@@ -836,24 +843,27 @@ int main(void)
                         //<editor-fold desc="Front as PC">
                         set_all_colors(strip_buf + STRIP_SIDE_LED_COUNT * 6, color_from_buf(pc_buf),
                                        STRIP_FRONT_LED_COUNT);
-                        if(current_profile.flags & PROFILE_FLAG_STRIP_MODE)
+                        if(globals.brightness[DEVICE_STRIP])
                         {
-                            digital(strip_buf, STRIP_SIDE_LED_COUNT * 2, 0, DEVICE_STRIP);
-                        }
-                        else
-                        {
-                            digital(strip_buf, STRIP_SIDE_LED_COUNT, 0, DEVICE_STRIP);
-                            for(uint8_t i = 0; i < STRIP_SIDE_LED_COUNT; ++i)
+                            if(current_profile.flags & PROFILE_FLAG_STRIP_MODE)
                             {
-                                uint8_t index = i * 3;
-                                strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 3] = strip_buf[index];
-                                strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 2] = strip_buf[index + 1];
-                                strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 1] = strip_buf[index + 2];
+                                digital(strip_buf, STRIP_SIDE_LED_COUNT * 2, 0, DEVICE_STRIP);
+                            }
+                            else
+                            {
+                                digital(strip_buf, STRIP_SIDE_LED_COUNT, 0, DEVICE_STRIP);
+                                for(uint8_t i = 0; i < STRIP_SIDE_LED_COUNT; ++i)
+                                {
+                                    uint8_t index = i * 3;
+                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 3] = strip_buf[index];
+                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 2] = strip_buf[index + 1];
+                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 1] = strip_buf[index + 2];
+                                }
                             }
                         }
                         //</editor-fold>
                     }
-                    else
+                    else if(globals.brightness[DEVICE_STRIP])
                     {
                         if(current_profile.flags & PROFILE_FLAG_STRIP_MODE)
                         {
@@ -871,18 +881,20 @@ int main(void)
                             for(uint8_t i = 0; i < STRIP_FRONT_LED_COUNT / 2; ++i)
                             {
                                 uint8_t index = i * 3;
-                                set_color_manual(front+index, color_from_buf(front_virtual+index*2));
+                                set_color_manual(front + index, color_from_buf(front_virtual + index * 2));
                             }
 
                             uint8_t front_half = STRIP_FRONT_LED_COUNT / 2 * 3;
                             front[front_half] = (front_virtual[front_half * 2] + front_virtual[front_half * 2 - 3]) / 2;
-                            front[front_half + 1] = (front_virtual[front_half * 2 + 1] + front_virtual[front_half * 2 - 2]) / 2;
-                            front[front_half + 2] = (front_virtual[front_half * 2 + 2] + front_virtual[front_half * 2 - 1]) / 2;
+                            front[front_half + 1] =
+                                    (front_virtual[front_half * 2 + 1] + front_virtual[front_half * 2 - 2]) / 2;
+                            front[front_half + 2] =
+                                    (front_virtual[front_half * 2 + 2] + front_virtual[front_half * 2 - 1]) / 2;
 
                             for(uint8_t i = STRIP_FRONT_LED_COUNT / 2 + 1; i < STRIP_FRONT_LED_COUNT; ++i)
                             {
                                 uint8_t index = i * 3;
-                                set_color_manual(front+index, color_from_buf(front_virtual+index*2-3));
+                                set_color_manual(front + index, color_from_buf(front_virtual + index * 2 - 3));
                             }
 
                             uint8_t i = STRIP_FRONT_LED_COUNT - 1;
@@ -952,7 +964,6 @@ int main(void)
                     //</editor-fold>
 
                     convert_bufs();
-                    apply_brightness();
                 }
                 else
                 {

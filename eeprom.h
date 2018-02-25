@@ -15,7 +15,7 @@ typedef struct
     uint8_t color_cycles;
     uint8_t timing[6];
     uint8_t args[5];
-    uint8_t colors[16 * 3];
+    uint8_t colors[PROFILE_COLOR_COUNT * 3];
 } __attribute__((packed)) device_profile;
 
 typedef struct
