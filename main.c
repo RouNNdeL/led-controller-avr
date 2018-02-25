@@ -833,8 +833,13 @@ int main(void)
                     if(current_profile.flags & PROFILE_FLAG_FRONT_PC)
                     {
                         //<editor-fold desc="Front as PC">
-                        set_all_colors(strip_buf + STRIP_SIDE_LED_COUNT * 6, color_from_buf(pc_buf),
-                                       STRIP_FRONT_LED_COUNT);
+                        for(uint8_t i = 0; i < STRIP_FRONT_LED_COUNT; ++i)
+                        {
+                            uint8_t index = i * 3;
+                            strip_buf[STRIP_SIDE_LED_COUNT * 6 + index++] = pc_buf[1];
+                            strip_buf[STRIP_SIDE_LED_COUNT * 6 + index++] = pc_buf[0];
+                            strip_buf[STRIP_SIDE_LED_COUNT * 6 + index] = pc_buf[2];
+                        }
                         if(globals.brightness[DEVICE_STRIP])
                         {
                             if(current_profile.flags & PROFILE_FLAG_STRIP_MODE)
