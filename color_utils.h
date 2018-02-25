@@ -44,6 +44,8 @@
 #define ARG_PARTICLES_SIZE 1
 #define ARG_PARTICLES_COUNT 2
 
+#define ARG_SPECTRUM_COLOR_COUNT 1
+
 #define TIME_OFF 0
 #define TIME_PARTICLE_SPEED 0
 #define TIME_FADEIN 1
@@ -83,6 +85,7 @@ typedef enum
     FILL = 0x04,
     ROTATING = 0x05,
     PARTICLES = 0x06,
+    SPECTRUM = 0x07,
     PIECES = 0x0C,
 
 } effect;
