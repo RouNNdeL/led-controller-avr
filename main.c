@@ -83,7 +83,7 @@ uint8_t gpu_buf[3];
 #define output_gpu(color) output_analog2(color[2], color[1], color[0])
 
 #define simple(buf, n) simple_effect(current_profile.devices[n].effect, buf, frame + frames[n][TIME_DELAY], frames[n],\
-current_profile.devices[n].args, colors[n], current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
+current_profile.devices[n].args, colors[n], current_profile.devices[n].color_count, current_profile.devices[n].color_cycles, 0)
 
 #define digital(buf, count, offset, n) digital_effect(current_profile.devices[n].effect, buf, count, offset, frame + frames[n][TIME_DELAY], frames[n],\
 current_profile.devices[n].args, colors[n], current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
@@ -135,7 +135,7 @@ void convert_all_colors()
 
 void convert_bufs()
 {
-    /* Convert from RGB to GRB expected by WS2812B and convert to actual brightness */
+    /* Convert to actual brightness */
     for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
     {
         uint8_t index = i * 3;
@@ -145,25 +145,17 @@ void convert_bufs()
         fan_buf[index + 1] = actual_brightness(fan_buf[index + 1]);
         fan_buf[index + 2] = actual_brightness(fan_buf[index + 2]);
 #endif /* #if (ACTUAL_BRIGHTNESS_DIGITAL != 0) */
-
-        uint8_t temp = fan_buf[index + 1];
-        fan_buf[index + 1] = fan_buf[index];
-        fan_buf[index] = temp;
     }
 
     for(uint8_t i = 0; i < STRIP_LED_COUNT + 1; ++i)
     {
-        uint16_t index = i * 3;
+        uint8_t index = i * 3;
 
 #if (ACTUAL_BRIGHTNESS_DIGITAL != 0)
         strip_buf_full[index] = actual_brightness(strip_buf_full[index]);
         strip_buf_full[index + 1] = actual_brightness(strip_buf_full[index + 1]);
         strip_buf_full[index + 2] = actual_brightness(strip_buf_full[index + 2]);
 #endif /* #if (ACTUAL_BRIGHTNESS_DIGITAL != 0) */
-
-        uint8_t temp = strip_buf_full[index + 1];
-        strip_buf_full[index + 1] = strip_buf_full[index];
-        strip_buf_full[index] = temp;
     }
 }
 
@@ -305,7 +297,7 @@ void init_avr()
     /* Initialize timer3 for time measurement */
     TCCR3B |= (1 << WGM32);  /* Set timer3 to CTC mode */
     TIMSK3 |= (1 << OCIE3A); /* Enable timer3 clear interrupt */
-    OCR3A = 40000;           /* Set timer3 A register to reset every 1/50s */
+    OCR3A = 31250;           /* Set timer3 A register to reset every 1/64s */
     TCCR3B |= (1 << CS31);   /* Set the timer3 prescaler to 8 */
 
     /* Initialize timer0 for PWM */

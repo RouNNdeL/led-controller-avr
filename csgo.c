@@ -143,7 +143,7 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
             uint16_t times[] = {0, 0, 0, control->damage * (uint16_t) DAMAGE_ANIMATION_TIME / UINT8_MAX};
             uint8_t args[] = {0, 0, damage_multiplied};
             uint8_t color[] = {DAMAGE_COLOR};
-            simple_effect(BREATHE, gpu, control->damage_frame, times, args, color, 1, 1);
+            simple_effect(BREATHE, gpu, control->damage_frame, times, args, color, 1, 1, 0);
             if(!state->health)
                 memcpy(pc, gpu, 3);
         }
@@ -172,7 +172,7 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
                 uint16_t times[] = {0, DAMAGE_ANIMATION_START};
                 uint8_t args[] = {0, 0, damage_multiplied};
                 uint8_t color[] = {DAMAGE_COLOR};
-                simple_effect(BREATHE, gpu, control->damage_frame, times, args, color, 1, 1);
+                simple_effect(BREATHE, gpu, control->damage_frame, times, args, color, 1, 1, 0);
             }
         }
     }
@@ -246,8 +246,8 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
         uint8_t color[] = {COLOR_T};
         uint16_t times[] = {0, ROUND_END_TRANSITION_TIME, 6000};
         uint8_t args[] = {0, 0, 255};
-        simple_effect(BREATHE, pc, control->round_state_frame, times, args, color, 1, 1);
-        simple_effect(BREATHE, gpu, control->round_state_frame, times, args, color, 1, 1);
+        simple_effect(BREATHE, pc, control->round_state_frame, times, args, color, 1, 1, 0);
+        simple_effect(BREATHE, gpu, control->round_state_frame, times, args, color, 1, 1, 0);
         digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->round_state_frame, times, args, color, 1, 1);
     }
     else if(state->round_state == ROUND_WIN_CT)
@@ -255,8 +255,8 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
         uint8_t color[] = {COLOR_CT};
         uint16_t times[] = {0, ROUND_END_TRANSITION_TIME, 6000};
         uint8_t args[] = {0, 0, 255};
-        simple_effect(BREATHE, pc, control->round_state_frame, times, args, color, 1, 1);
-        simple_effect(BREATHE, gpu, control->round_state_frame, times, args, color, 1, 1);
+        simple_effect(BREATHE, pc, control->round_state_frame, times, args, color, 1, 1, 0);
+        simple_effect(BREATHE, gpu, control->round_state_frame, times, args, color, 1, 1, 0);
         digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->round_state_frame, times, args, color, 1, 1);
     }
     //</editor-fold>

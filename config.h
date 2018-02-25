@@ -1,7 +1,7 @@
 #ifndef LEDCONTROLLER_CONFIG_H
 #define LEDCONTROLLER_CONFIG_H
 
-#define FPS 50
+#define FPS 64
 #define COMPILE_DEMOS 0 /* Demos take up a lot of memory, disable them here */
 #define COMPILE_CSGO 1
 #define COMPILE_UART 1

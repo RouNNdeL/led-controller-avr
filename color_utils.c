@@ -3,6 +3,30 @@
 #include "color_utils.h"
 #include "uart.h"
 
+/* Credit: https://github.com/FastLED/FastLED */
+uint8_t scale8(uint8_t i, uint8_t scale)
+{
+    uint8_t work = i;
+    uint8_t cnt = 0x80;
+    asm volatile(
+    "  inc %[scale]                 \n\t"
+            "  breq DONE_%=                 \n\t"
+            "  clr %[work]                  \n\t"
+            "LOOP_%=:                       \n\t"
+            "  sbrc %[scale], 0             \n\t"
+            "  add %[work], %[i]            \n\t"
+            "  ror %[work]                  \n\t"
+            "  lsr %[scale]                 \n\t"
+            "  lsr %[cnt]                   \n\t"
+            "brcc LOOP_%=                   \n\t"
+            "DONE_%=:                       \n\t"
+    : [work] "+r"(work), [cnt] "+r"(cnt)
+    : [scale] "r"(scale), [i] "r"(i)
+    :
+    );
+    return work;
+}
+
 void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b)
 {
     uint16_t index = 3 * led;
@@ -73,37 +97,55 @@ void cross_fade_bright(uint8_t *color, uint8_t r1, uint8_t g1, uint8_t b1, uint8
     }
 }
 
-void rainbow_at_progress_full(uint8_t *color, uint16_t progress, uint8_t brightness)
+void rainbow_at_progress_full(uint8_t *color, uint16_t progress, uint8_t brightness, uint8_t grb)
 {
     if(progress <= 21845)
     {
-        cross_fade_bright(color, COLOR_RED, COLOR_BLUE, progress/86);
+        if(grb)
+            cross_fade_bright(color, COLOR_GREEN, COLOR_BLUE, progress / 86);
+        else
+            cross_fade_bright(color, COLOR_RED, COLOR_BLUE, progress / 86);
     }
-    else if((progress-=21845) <= 21845)
+    else if((progress -= 21845) <= 21845)
     {
-        cross_fade_bright(color, COLOR_BLUE, COLOR_GREEN, progress/86);
+        if(grb)
+            cross_fade_bright(color, COLOR_BLUE, COLOR_RED, progress / 86);
+        else
+            cross_fade_bright(color, COLOR_BLUE, COLOR_GREEN, progress / 86);
     }
-    else if((progress-=21845) <= 21845)
+    else if((progress -= 21845) <= 21845)
     {
-        cross_fade_bright(color, COLOR_GREEN, COLOR_RED, progress/86);
+        if(grb)
+            cross_fade_bright(color, COLOR_RED, COLOR_GREEN, progress / 86);
+        else
+            cross_fade_bright(color, COLOR_GREEN, COLOR_RED, progress / 86);
     }
 
     set_color_manual(color, color_brightness(brightness, color_from_buf(color)));
 }
 
-void rainbow_at_progress(uint8_t *color, uint16_t progress, uint8_t brightness)
+void rainbow_at_progress(uint8_t *color, uint16_t progress, uint8_t brightness, uint8_t grb)
 {
     if(progress <= 21845)
     {
-        cross_fade_values(color, COLOR_RED, COLOR_BLUE, progress/86);
+        if(grb)
+            cross_fade_values(color, COLOR_GREEN, COLOR_BLUE, progress / 86);
+        else
+            cross_fade_values(color, COLOR_RED, COLOR_BLUE, progress / 86);
     }
-    else if((progress-=21845) <= 21845)
+    else if((progress -= 21845) <= 21845)
     {
-        cross_fade_values(color, COLOR_BLUE, COLOR_GREEN, progress/86);
+        if(grb)
+            cross_fade_values(color, COLOR_BLUE, COLOR_RED, progress / 86);
+        else
+            cross_fade_values(color, COLOR_BLUE, COLOR_GREEN, progress / 86);
     }
-    else if((progress-=21845) <= 21845)
+    else if((progress -= 21845) <= 21845)
     {
-        cross_fade_values(color, COLOR_GREEN, COLOR_RED, progress/86);
+        if(grb)
+            cross_fade_values(color, COLOR_RED, COLOR_GREEN, progress / 86);
+        else
+            cross_fade_values(color, COLOR_GREEN, COLOR_RED, progress / 86);
     }
 
     set_color_manual(color, color_brightness(brightness, color_from_buf(color)));
@@ -184,8 +226,7 @@ void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, ui
  * @return - a color to be displayed at a given frame
  */
 void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *times, uint8_t *args, uint8_t *colors,
-                   uint8_t color_count,
-                   uint8_t color_cycles)
+                   uint8_t color_count, uint8_t color_cycles, uint8_t grb)
 {
     uint32_t sum = times[0] + times[1] + times[2] + times[3];
     uint32_t d_time = frame % sum;
@@ -244,7 +285,7 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
             else
             {
                 uint16_t progress = d_time * UINT16_MAX / times[TIME_FADEOUT];
-                rainbow_at_progress_full(color, progress, args[ARG_RAINBOW_BRIGHTNESS]);
+                rainbow_at_progress_full(color, progress, args[ARG_RAINBOW_BRIGHTNESS], grb);
             }
         }
         //</editor-fold>
@@ -281,13 +322,13 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
  *               in a RGB order
  * @param color_count - how many colors are in use
  */
-void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t start_led, uint32_t frame,
-                    uint16_t *times, uint8_t *args, uint8_t *colors, uint8_t color_count, uint8_t color_cycles)
+void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t start_led, uint32_t frame, uint16_t *times,
+                    uint8_t *args, uint8_t *colors, uint8_t color_count, uint8_t color_cycles)
 {
     if(effect == BREATHE || effect == FADE || (effect == RAINBOW && (args[ARG_BIT_PACK] & RAINBOW_SIMPLE)))
     {
         uint8_t color[3];
-        simple_effect(effect, color, frame, times, args, colors, color_count, color_cycles);
+        simple_effect(effect, color, frame, times, args, colors, color_count, color_cycles, 1);
         set_all_colors(leds, color[0], color[1], color[2], led_count);
         return;
     }
@@ -505,9 +546,9 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                 uint16_t d_progress =
                         (rotation_progress + i * led_progress_base) * args[ARG_RAINBOW_SOURCES] % UINT16_MAX;
                 if(args[ARG_BIT_PACK] & RAINBOW_MODE)
-                    rainbow_at_progress_full(leds + alt_index, d_progress, args[ARG_RAINBOW_BRIGHTNESS]);
+                    rainbow_at_progress_full(leds + alt_index, d_progress, args[ARG_RAINBOW_BRIGHTNESS], 1);
                 else
-                    rainbow_at_progress(leds + alt_index, d_progress, args[ARG_RAINBOW_BRIGHTNESS]);
+                    rainbow_at_progress(leds + alt_index, d_progress, args[ARG_RAINBOW_BRIGHTNESS], 1);
             }
         }
         //</editor-fold>
@@ -648,8 +689,8 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint8_t args[] = {0, 0, 255, 0, 0};
 
         digital_effect(BREATHE, fan_buf, 12, 2, frame + 8, times, args, colors + 9, 1, 1);
-        simple_effect(BREATHE, gpu_buf, frame + 8, times, args, colors + 9, 1, 1);
-        simple_effect(BREATHE, pc_buf, frame + 8, times, args, colors + 9, 1, 1);
+        simple_effect(BREATHE, gpu_buf, frame + 8, times, args, colors + 9, 1, 1, 0);
+        simple_effect(BREATHE, pc_buf, frame + 8, times, args, colors + 9, 1, 1, 0);
     }
     else if((frame -= 32) < 28)
     {
@@ -666,7 +707,7 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint8_t args[] = {0, 0, 255, 0, 0};
 
         set_color(pc_buf, 0, 0, 0, 0);
-        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1);
+        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1, 0);
         set_all_colors(fan_buf, 0, 0, 0, 12);
     }
     else if((frame -= 28) < 28)
@@ -674,7 +715,7 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint16_t times[] = {6, 0, 50, 0, 0};
         uint8_t args[] = {0, 0, 255, 0, 0};
 
-        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1);
+        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1, 0);
         set_color(gpu_buf, 0, 0, 0, 0);
         set_all_colors(fan_buf, 0, 0, 0, 12);
     }
@@ -683,8 +724,8 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint16_t times[] = {6, 0, 50, 0, 0};
         uint8_t args[] = {0, 0, 255, 0, 0};
 
-        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1);
-        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1);
+        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1, 0);
+        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1, 0);
         digital_effect(BREATHE, fan_buf, 12, 2, frame, times, args, colors, 1, 1);
     }
     else if((frame -= 28) < 112)
@@ -692,8 +733,8 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint16_t times1[] = {0, 16, 0, 16, 0};
         uint8_t args1[] = {0, 20, 255, 0, 0};
 
-        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 1);
-        simple_effect(BREATHE, gpu_buf, frame + 8, times1, args1, colors + 3, 2, 2);
+        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 1, 0);
+        simple_effect(BREATHE, gpu_buf, frame + 8, times1, args1, colors + 3, 2, 2, 0);
         digital_effect(BREATHE, fan_buf, 12, 2, frame, times1, args1, colors, 2, 1);
     }
     else if((frame -= 112) < 128)
@@ -704,7 +745,7 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint8_t args2[] = {SMOOTH | DIRECTION, 1, 1, 0, 0};
 
         set_color(pc_buf, 0, 0, 0, 0);
-        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors + 3, 2, 2);
+        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors + 3, 2, 2, 0);
         digital_effect(FILL, fan_buf, 12, 2, frame, times2, args2, colors, 2, 1);
     }
     else if((frame -= 128) < 128)
@@ -712,8 +753,8 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint16_t times1[] = {16, 0, 8, 0, 0};
         uint8_t args1[] = {0, 0, 255, 0, 0};
 
-        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 1);
-        simple_effect(BREATHE, gpu_buf, frame + 8, times1, args1, colors + 3, 2, 2);
+        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 1, 0);
+        simple_effect(BREATHE, gpu_buf, frame + 8, times1, args1, colors + 3, 2, 2, 0);
         digital_effect(BREATHE, fan_buf, 12, 2, frame, times1, args1, colors, 2, 1);
     }
     else if((frame -= 128) < 128)
@@ -729,7 +770,7 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         args2[ARG_FILL_PIECE_DIRECTIONS2] = 0;
 
         set_color(pc_buf, 0, 0, 0, 0);
-        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors, 2, 2);
+        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors, 2, 2, 0);
         digital_effect(FILL, fan_buf, 12, 2, frame, times2, args2, colors + 3, 2, 1);
     }
     else if((frame -= 128) < 96)
@@ -737,8 +778,8 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint16_t times1[] = {0, 16, 0, 16, 0};
         uint8_t args1[] = {0, 20, 255, 0, 0};
 
-        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 1);
-        simple_effect(BREATHE, gpu_buf, frame + 8, times1, args1, colors + 3, 2, 2);
+        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 1, 0);
+        simple_effect(BREATHE, gpu_buf, frame + 8, times1, args1, colors + 3, 2, 2, 0);
         digital_effect(BREATHE, fan_buf, 12, 2, frame, times1, args1, colors, 2, 1);
     }
     else if((frame -= 96) < 128)
@@ -753,8 +794,8 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         args2[ARG_FILL_PIECE_DIRECTIONS1] = 0;
         args2[ARG_FILL_PIECE_DIRECTIONS2] = 0;
 
-        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 1);
-        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors + 3, 2, 2);
+        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 1, 0);
+        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors + 3, 2, 2, 0);
         digital_effect(FILL, fan_buf, 12, 2, frame, times2, args2, colors, 2, 1);
     }
     else
@@ -772,8 +813,8 @@ uint8_t demo_effects(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32
         uint8_t args[] = {0, 0, 255, 0, 0};
 
         digital_effect(BREATHE, fan_buf, 12, 2, frame + 256, times, args, colors, 1, 1);
-        simple_effect(BREATHE, gpu_buf, frame + 128, times, args, colors + 3, 1, 1);
-        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1);
+        simple_effect(BREATHE, gpu_buf, frame + 128, times, args, colors + 3, 1, 1, 0);
+        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1, 0);
     }
     else if((frame -= 384) < 128)
     {
@@ -783,8 +824,8 @@ uint8_t demo_effects(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32
         uint8_t args[] = {0, 0, 255, 0, 0};
 
         digital_effect(BREATHE, fan_buf, 12, 2, frame, times, args, colors, 1, 1);
-        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1);
-        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1);
+        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1, 0);
+        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1, 0);
     }
     else if((frame -= 128) < 256)
     {
