@@ -813,19 +813,24 @@ int main(void)
                 if(globals.leds_enabled)
                 {
                     if(globals.brightness[DEVICE_PC])
-                    {
                         simple(pc_buf, DEVICE_PC);
-                    }
+                    else
+                        set_color(pc_buf, 0, 0, 0, 0);
+
                     if(globals.brightness[DEVICE_GPU])
-                    {
                         simple(gpu_buf, DEVICE_GPU);
-                    }
+                    else
+                        set_color(gpu_buf, 0, 0, 0, 0);
 
                     for(uint8_t i = 0; i < globals.fan_count; ++i)
                     {
                         if(globals.brightness[DEVICE_FAN + i])
                         {
                             digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
+                        }
+                        else
+                        {
+                            set_all_colors(fan_buf+i*FAN_LED_COUNT*3, 0, 0, 0, FAN_LED_COUNT);
                         }
                     }
 
@@ -857,6 +862,10 @@ int main(void)
                                     strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 1] = strip_buf[index + 2];
                                 }
                             }
+                        }
+                        else
+                        {
+                            set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT);
                         }
                         //</editor-fold>
                     }
@@ -958,13 +967,17 @@ int main(void)
                             //</editor-fold>
                         }
                     }
+                    else
+                    {
+                        set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT);
+                    }
                     //</editor-fold>
 
                     convert_bufs();
                 }
                 else
                 {
-                    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
+                    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT * globals.fan_count);
                     set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT);
 
                     set_color(pc_buf, 0, 0, 0, 0);
