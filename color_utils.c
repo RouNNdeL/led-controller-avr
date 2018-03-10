@@ -35,11 +35,29 @@ void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b)
     p_buf[index] = b;
 }
 
-void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t count)
+void set_color_grb(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b)
 {
-    for(uint8_t i = 0; i < count; ++i)
+    uint16_t index = 3 * led;
+    p_buf[index++] = g;
+    p_buf[index++] = r;
+    p_buf[index] = b;
+}
+
+void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t count, uint8_t grb)
+{
+    if(grb)
     {
-        set_color(p_buf, i, r, g, b);
+        for(uint8_t i = 0; i < count; ++i)
+        {
+            set_color_grb(p_buf, i, r, g, b);
+        }
+    }
+    else
+    {
+        for(uint8_t i = 0; i < count; ++i)
+        {
+            set_color(p_buf, i, r, g, b);
+        }
     }
 }
 
@@ -329,7 +347,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
     {
         uint8_t color[3];
         simple_effect(effect, color, frame, times, args, colors, color_count, color_cycles, 1);
-        set_all_colors(leds, color[0], color[1], color[2], led_count);
+        set_all_colors(leds, color[0], color[1], color[2], led_count, 0);
         return;
     }
     if(effect != PIECES && effect != ROTATING && effect != PARTICLES)
@@ -345,7 +363,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
 
         if((d_time) < times[TIME_OFF])
         {
-            set_all_colors(leds, 0x00, 0x00, 0x00, led_count);
+            set_all_colors(leds, 0x00, 0x00, 0x00, led_count, 0);
         }
         else if((d_time -= times[TIME_OFF]) < times[TIME_FADEIN])
         {
@@ -708,7 +726,7 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
 
         set_color(pc_buf, 0, 0, 0, 0);
         simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1, 0);
-        set_all_colors(fan_buf, 0, 0, 0, 12);
+        set_all_colors(fan_buf, 0, 0, 0, 12, 1);
     }
     else if((frame -= 28) < 28)
     {
@@ -717,7 +735,7 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
 
         simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1, 0);
         set_color(gpu_buf, 0, 0, 0, 0);
-        set_all_colors(fan_buf, 0, 0, 0, 12);
+        set_all_colors(fan_buf, 0, 0, 0, 12, 1);
     }
     else if((frame -= 28) < 28)
     {

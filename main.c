@@ -314,8 +314,8 @@ void init_avr()
 
     sei();                   /* Enable global interrupts */
 
-    set_all_colors(strip_buf_full, 0, 0, 0, STRIP_LED_COUNT + 1);
-    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT);
+    set_all_colors(strip_buf_full, 0, 0, 0, STRIP_LED_COUNT + 1, 1);
+    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT, 1);
 
     set_color(pc_buf, 0, 0, 0, 0);
     set_color(gpu_buf, 0, 0, 0, 0);
@@ -830,7 +830,7 @@ int main(void)
                         }
                         else
                         {
-                            set_all_colors(fan_buf+i*FAN_LED_COUNT*3, 0, 0, 0, FAN_LED_COUNT);
+                            set_all_colors(fan_buf+i*FAN_LED_COUNT*3, 0, 0, 0, FAN_LED_COUNT, 1);
                         }
                     }
 
@@ -865,7 +865,7 @@ int main(void)
                         }
                         else
                         {
-                            set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT);
+                            set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT, 1);
                         }
                         //</editor-fold>
                     }
@@ -933,7 +933,7 @@ int main(void)
                                 digital(strip_buf, STRIP_SIDE_LED_COUNT, 0, DEVICE_STRIP);
                                 set_all_colors(strip_buf + STRIP_SIDE_LED_COUNT * 6,
                                                color_from_buf(strip_buf + STRIP_SIDE_LED_COUNT * 3 - 3),
-                                               STRIP_FRONT_LED_COUNT);
+                                               STRIP_FRONT_LED_COUNT, 0);
                             }
                             else
                             {
@@ -969,7 +969,7 @@ int main(void)
                     }
                     else
                     {
-                        set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT);
+                        set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT, 1);
                     }
                     //</editor-fold>
 
@@ -977,8 +977,8 @@ int main(void)
                 }
                 else
                 {
-                    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT * globals.fan_count);
-                    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT);
+                    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT * globals.fan_count, 1);
+                    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT, 1);
 
                     set_color(pc_buf, 0, 0, 0, 0);
                     set_color(gpu_buf, 0, 0, 0, 0);

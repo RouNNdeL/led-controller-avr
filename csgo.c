@@ -17,19 +17,19 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
         uint8_t ammo_color[3];
         if(transition_ammo >= AMMO_FADE_START)
         {
-            set_color(ammo_color, 0, AMMO_COLOR_NORMAL);
+            set_color_grb(ammo_color, 0, AMMO_COLOR_NORMAL);
         }
         else if(transition_ammo > AMMO_FADE_END)
         {
             uint8_t temp[6];
-            set_color(temp, 0, AMMO_COLOR_NORMAL);
-            set_color(temp, 1, AMMO_COLOR_LOW);
+            set_color_grb(temp, 0, AMMO_COLOR_NORMAL);
+            set_color_grb(temp, 1, AMMO_COLOR_LOW);
             cross_fade(ammo_color, temp, 3, 0, (transition_ammo - AMMO_FADE_END) *
                                                (uint16_t) UINT8_MAX / (AMMO_FADE_START - AMMO_FADE_END));
         }
         else
         {
-            set_color(ammo_color, 0, AMMO_COLOR_LOW);
+            set_color_grb(ammo_color, 0, AMMO_COLOR_LOW);
         }
 
         uint16_t led_progress = transition_ammo * FAN_LED_COUNT;
@@ -69,17 +69,17 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
     {
         uint16_t times[] = {0, BOMB_ANIMATION_TIME / 2, 0, BOMB_ANIMATION_TIME / 2, 0, 0};
         uint8_t args[] = {0, BOMB_ANIMATION_LOW, BOMB_ANIMATION_HIGH};
-        uint8_t colors[] = {BOMB_SLOT_COLOR};
+        uint8_t colors[] = {grb(BOMB_SLOT_COLOR)};
         digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->bomb_slot_frame, times, args, colors, 1, 1);
     }
     else if(state->weapon_slot)
     {
-        set_all_colors(fan, AMMO_COLOR_NO_AMMO, FAN_LED_COUNT);
+        set_all_colors(fan, AMMO_COLOR_NO_AMMO, FAN_LED_COUNT, 1);
     }
     else
     {
         fan_black = 1;
-        set_all_colors(fan, COLOR_BLACK, FAN_LED_COUNT);
+        set_all_colors(fan, COLOR_BLACK, FAN_LED_COUNT, 1);
     }
     //</editor-fold>
 
@@ -236,7 +236,7 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
         {
             set_color(gpu, 0, BOMB_BEEP_COLOR);
             set_color(pc, 0, BOMB_BEEP_COLOR);
-            set_all_colors(fan, BOMB_BEEP_COLOR, FAN_LED_COUNT);
+            set_all_colors(fan, BOMB_BEEP_COLOR, FAN_LED_COUNT, 1);
         }
     }
 
@@ -244,20 +244,22 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
     if(state->round_state == ROUND_WIN_T)
     {
         uint8_t color[] = {COLOR_T};
+        uint8_t color_grb[] = {grb(COLOR_T)};
         uint16_t times[] = {0, ROUND_END_TRANSITION_TIME, 6000};
         uint8_t args[] = {0, 0, 255};
         simple_effect(BREATHE, pc, control->round_state_frame, times, args, color, 1, 1, 0);
         simple_effect(BREATHE, gpu, control->round_state_frame, times, args, color, 1, 1, 0);
-        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->round_state_frame, times, args, color, 1, 1);
+        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->round_state_frame, times, args, color_grb, 1, 1);
     }
     else if(state->round_state == ROUND_WIN_CT)
     {
         uint8_t color[] = {COLOR_CT};
+        uint8_t color_grb[] = {grb(COLOR_CT)};
         uint16_t times[] = {0, ROUND_END_TRANSITION_TIME, 6000};
         uint8_t args[] = {0, 0, 255};
         simple_effect(BREATHE, pc, control->round_state_frame, times, args, color, 1, 1, 0);
         simple_effect(BREATHE, gpu, control->round_state_frame, times, args, color, 1, 1, 0);
-        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->round_state_frame, times, args, color, 1, 1);
+        digital_effect(BREATHE, fan, FAN_LED_COUNT, 0, control->round_state_frame, times, args, color_grb, 1, 1);
     }
     //</editor-fold>
 
@@ -286,8 +288,9 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
     {
         uint8_t fan_cpy[FAN_LED_COUNT * 3 + 3];
         memcpy(fan_cpy, fan, FAN_LED_COUNT * 3);
-        fan_cpy[FAN_LED_COUNT * 3] = analog_base[6];
-        fan_cpy[FAN_LED_COUNT * 3 + 1] = analog_base[7];
+        //Order 7,6,8 to account for GRB
+        fan_cpy[FAN_LED_COUNT * 3] = analog_base[7];
+        fan_cpy[FAN_LED_COUNT * 3 + 1] = analog_base[6];
         fan_cpy[FAN_LED_COUNT * 3 + 2] = analog_base[8];
 
         for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
@@ -299,7 +302,7 @@ void process_csgo(csgo_control *control, game_state *state, game_state *old_stat
 
     //<editor-fold desc="Underglow">
     //TODO: Add proper support
-    set_all_colors(strip, color_from_buf(pc), STRIP_LED_COUNT);
+    set_all_colors(strip, color_from_buf(pc), STRIP_LED_COUNT, 1);
     //</editor-fold>
 
     //<editor-fold desc="Variable resets">

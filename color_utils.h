@@ -67,6 +67,15 @@ r * brightness / UINT8_MAX, g * brightness / UINT8_MAX, b * brightness / UINT8_M
 (buf)[1] = g;\
 (buf)[2] = b
 
+#define set_color_manual_grb(buf, ...) _set_color_manual(buf, __VA_ARGS__)
+#define _set_color_manual_grb(buf, r, g, b)\
+(buf)[0] = g;\
+(buf)[1] = r;\
+(buf)[2] = b
+
+#define grb(...) _grb(__VA_ARGS__)
+#define _grb(r,g,b) g,r,b
+
 #define COLOR_BLACK rgb(0, 0, 0)
 #define COLOR_WHITE rgb(255, 255, 255)
 #define COLOR_RED rgb(255, 0, 0)
@@ -92,9 +101,11 @@ typedef enum
 
 uint8_t scale8(uint8_t i, uint8_t scale);
 
-void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t count);
+void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t count, uint8_t grb);
 
 void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b);
+
+void set_color_grb(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b);
 
 void cross_fade(uint8_t *color, uint8_t *colors, uint8_t n_color, uint8_t m_color, uint8_t progress);
 
