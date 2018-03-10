@@ -9,21 +9,18 @@ uint8_t scale8(uint8_t i, uint8_t scale)
     uint8_t work = i;
     uint8_t cnt = 0x80;
     asm volatile(
-    "  inc %[scale]                 \n\t"
-            "  breq DONE_%=                 \n\t"
-            "  clr %[work]                  \n\t"
-            "LOOP_%=:                       \n\t"
-            "  sbrc %[scale], 0             \n\t"
-            "  add %[work], %[i]            \n\t"
-            "  ror %[work]                  \n\t"
-            "  lsr %[scale]                 \n\t"
-            "  lsr %[cnt]                   \n\t"
-            "brcc LOOP_%=                   \n\t"
-            "DONE_%=:                       \n\t"
-    : [work] "+r"(work), [cnt] "+r"(cnt)
-    : [scale] "r"(scale), [i] "r"(i)
-    :
-    );
+    // Multiply 8-bit i * 8-bit scale, giving 16-bit r1,r0
+    "mul %0, %1          \n\t"
+            // Add i to r0, possibly setting the carry flag
+            "add r0, %0         \n\t"
+            // load the immediate 0 into i (note, this does _not_ touch any flags)
+            "ldi %0, 0x00       \n\t"
+            // walk and chew gum at the same time
+            "clr __zero_reg__    \n\t"
+
+    : "+a" (i)      /* writes to i */
+    : "a"  (scale)  /* uses scale */
+    : "r0", "r1"    /* clobbers r0, r1 */ );
     return work;
 }
 
