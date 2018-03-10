@@ -53,7 +53,7 @@ uint32_t auto_increment;
 #define refresh_profile() change_profile(globals.profile_order[globals.n_profile]); convert_all_frames();\
 backup_all_args(); convert_all_colors()
 
-#define brightness(device, color) (color * globals.brightness[device]) / UINT8_MAX
+#define brightness(device, color) scale8(color, globals.brightness[device])
 #endif /* (COMPILE_EFFECTS != 0) */
 //</editor-fold>
 
@@ -366,6 +366,7 @@ void process_uart()
                                    DEVICE_LENGTH);
                             uart_flags &= ~UART_FLAG_LOCK;
                             convert_to_frames(frames[uart_buffer[1]], current_profile.devices[uart_buffer[1]].timing);
+                            memcpy(backup_args[uart_buffer[1]], current_profile.devices[uart_buffer[1]].args, 5);
                             convert_colors_for_brightness(uart_buffer[1]);
 
                             flags |= FLAG_PROFILE_UPDATED;

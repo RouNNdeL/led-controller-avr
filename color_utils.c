@@ -6,22 +6,32 @@
 /* Credit: https://github.com/FastLED/FastLED */
 uint8_t scale8(uint8_t i, uint8_t scale)
 {
-    uint8_t work = i;
-    uint8_t cnt = 0x80;
     asm volatile(
+#define FASTLED_SCALE8_FIXED 0
+#if (FASTLED_SCALE8_FIXED==1)
     // Multiply 8-bit i * 8-bit scale, giving 16-bit r1,r0
+        "mul %0, %1          \n\t"
+        // Add i to r0, possibly setting the carry flag
+        "add r0, %0         \n\t"
+        // load the immediate 0 into i (note, this does _not_ touch any flags)
+        "ldi %0, 0x00       \n\t"
+        // walk and chew gum at the same time
+        "adc %0, r1          \n\t"
+#else
+    /* Multiply 8-bit i * 8-bit scale, giving 16-bit r1,r0 */
     "mul %0, %1          \n\t"
-            // Add i to r0, possibly setting the carry flag
-            "add r0, %0         \n\t"
-            // load the immediate 0 into i (note, this does _not_ touch any flags)
-            "ldi %0, 0x00       \n\t"
-            // walk and chew gum at the same time
+            /* Move the high 8-bits of the product (r1) back to i */
+            "mov %0, r1          \n\t"
+            /* Restore r1 to "0"; it's expected to always be that */
+#endif
             "clr __zero_reg__    \n\t"
 
     : "+a" (i)      /* writes to i */
     : "a"  (scale)  /* uses scale */
     : "r0", "r1"    /* clobbers r0, r1 */ );
-    return work;
+
+    /* Return the result */
+    return i;
 }
 
 void set_color(uint8_t *p_buf, uint8_t led, uint8_t r, uint8_t g, uint8_t b)
