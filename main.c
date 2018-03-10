@@ -799,12 +799,24 @@ int main(void)
 #if (COMPILE_CSGO != 0)
             if(flags & FLAG_CSGO_ENABLED)
             {
-                process_csgo(&csgo_ctrl, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf, pc_buf,
-                             strip_buf);
+                if(globals.leds_enabled)
+                {
+                    process_csgo(&csgo_ctrl, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf,
+                                 pc_buf,
+                                 strip_buf);
 
-                csgo_increment_frames();
+                    csgo_increment_frames();
 
-                convert_bufs();
+                    convert_bufs();
+                }
+                else
+                {
+                    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT * globals.fan_count, 1);
+                    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT, 1);
+
+                    set_color(pc_buf, 0, 0, 0, 0);
+                    set_color(gpu_buf, 0, 0, 0, 0);
+                }
             }
             else
             {
