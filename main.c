@@ -17,7 +17,9 @@ extern void output_grb_fan(uint8_t *ptr, uint16_t count);
 #define FLAG_NEW_FRAME (1 << 0)
 #define FLAG_BUTTON (1 << 1)
 #define FLAG_RESET (1 << 2)
+#if (COMPILE_EFFECTS != 0)
 #define FLAG_PROFILE_UPDATED (1 << 3)
+#endif /* (COMPILE_EFFECTS != 0) */
 
 #if (COMPILE_CSGO != 0)
 #define FLAG_CSGO_ENABLED (1 << 4)
@@ -33,11 +35,15 @@ volatile uint8_t flags = 0;
 //</editor-fold>
 
 //<editor-fold desc="Data">
+global_settings EEMEM globals_addr;
+global_settings globals;
+
+#define save_globals() eeprom_update_block(&globals, &globals_addr, GLOBALS_LENGTH)
+#define brightness(device, color) scale8(color, globals.brightness[device])
+
 #if (COMPILE_EFFECTS != 0)
 profile EEMEM profiles[PROFILE_COUNT];
-global_settings EEMEM globals_addr;
 
-global_settings globals;
 profile current_profile;
 uint16_t frames[6][6];
 uint8_t colors[6][PROFILE_COLOR_COUNT * 3];
@@ -47,13 +53,10 @@ uint32_t auto_increment;
 #define fetch_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH)
 #define change_profile(n) eeprom_read_block(&current_profile, &profiles[n], PROFILE_LENGTH)
 #define save_profile(p, n) eeprom_update_block(&p, &profiles[n], PROFILE_LENGTH)
-#define save_globals() eeprom_update_block(&globals, &globals_addr, GLOBALS_LENGTH)
 
 #define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count
 #define refresh_profile() change_profile(globals.profile_order[globals.n_profile]); convert_all_frames();\
 backup_all_args(); convert_all_colors()
-
-#define brightness(device, color) scale8(color, globals.brightness[device])
 #endif /* (COMPILE_EFFECTS != 0) */
 //</editor-fold>
 
@@ -100,6 +103,8 @@ volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run 
 uint8_t demo = 0;
 #endif /* (COMPILE_DEMOS != 0) */
 
+
+#if (COMPILE_EFFECTS != 0)
 void backup_all_args()
 {
     for(uint8_t i = 0; i < 6; ++i)
@@ -132,31 +137,32 @@ void convert_all_colors()
         convert_colors_for_brightness(i);
     }
 }
+#endif /* (COMPILE_EFFECTS != 0) */
 
 void convert_bufs()
 {
     /* Convert to actual brightness */
+#if (ACTUAL_BRIGHTNESS_DIGITAL != 0)
     for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
     {
         uint8_t index = i * 3;
 
-#if (ACTUAL_BRIGHTNESS_DIGITAL != 0)
         fan_buf[index] = actual_brightness(fan_buf[index]);
         fan_buf[index + 1] = actual_brightness(fan_buf[index + 1]);
         fan_buf[index + 2] = actual_brightness(fan_buf[index + 2]);
-#endif /* #if (ACTUAL_BRIGHTNESS_DIGITAL != 0) */
     }
+#endif /* #if (ACTUAL_BRIGHTNESS_DIGITAL != 0) */
 
+#if (ACTUAL_BRIGHTNESS_DIGITAL != 0)
     for(uint8_t i = 0; i < STRIP_LED_COUNT + 1; ++i)
     {
         uint8_t index = i * 3;
 
-#if (ACTUAL_BRIGHTNESS_DIGITAL != 0)
         strip_buf_full[index] = actual_brightness(strip_buf_full[index]);
         strip_buf_full[index + 1] = actual_brightness(strip_buf_full[index + 1]);
         strip_buf_full[index + 2] = actual_brightness(strip_buf_full[index + 2]);
-#endif /* #if (ACTUAL_BRIGHTNESS_DIGITAL != 0) */
     }
+#endif /* #if (ACTUAL_BRIGHTNESS_DIGITAL != 0) */
 }
 
 void output_analog1(uint8_t q1, uint8_t q2, uint8_t q3)
@@ -734,16 +740,21 @@ int main(void)
             uint32_t time = frame - button_frame;
             if(time > BUTTON_MIN_FRAMES)
             {
+#if (COMPILE_EFFECTS != 0)
                 if(flags & FLAG_PROFILE_UPDATED)
                 {
                     save_profile(current_profile, globals.profile_order[globals.n_profile]);
                     flags &= ~FLAG_PROFILE_UPDATED;
                 }
+#endif /* (COMPILE_EFFECTS != 0) */
+
                 if(time < BUTTON_OFF_FRAMES && globals.leds_enabled)
                 {
+#if (COMPILE_EFFECTS != 0)
                     increment_profile();
-                    save_globals();
                     refresh_profile();
+#endif /* (COMPILE_EFFECTS != 0) */
+                    save_globals();
                     uart_transmit(GLOBALS_UPDATED);
                     frame = 0;
                 }
