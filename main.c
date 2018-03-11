@@ -533,6 +533,27 @@ void process_uart()
                 break;
                 //</editor-fold>
             }
+            case FRAME_JUMP:
+            {
+                if(!(uart_flags & UART_FLAG_RECEIVE))
+                {
+                    uart_transmit(READY_TO_RECEIVE);
+                    uart_flags |= UART_FLAG_RECEIVE;
+                }
+                else if(uart_buffer_length >= sizeof(uint32_t))
+                {
+                    uint32_t new_frame;
+                    uart_flags |= UART_FLAG_LOCK;
+                    memcpy(&new_frame, (const void *) (uart_buffer), sizeof(uint32_t));
+                    uart_flags &= ~UART_FLAG_LOCK;
+
+                    frame = new_frame;
+                    uart_transmit(RECEIVE_SUCCESS);
+
+                    reset_uart();
+                }
+                break;
+            }
 #else
             case SAVE_PROFILE:
             case SAVE_GLOBALS:
@@ -673,6 +694,7 @@ void process_uart()
             default:
             {
                 uart_transmit(UNRECOGNIZED_COMMAND);
+                reset_uart();
             }
         }
     }
