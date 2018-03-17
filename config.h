@@ -22,7 +22,10 @@
 #define BUTTON_RESET_FRAMES 5 * FPS
 
 #define PROFILE_COUNT 8
-#define PROFILE_COLOR_COUNT 16
+#define COLOR_COUNT 16
+#define DEVICE_COUNT 6
+#define ARG_COUNT 5
+#define TIME_COUNT 6
 
 #define FAN_LED_COUNT 12
 #define MAX_FAN_COUNT 3

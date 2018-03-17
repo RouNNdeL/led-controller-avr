@@ -13,26 +13,26 @@ typedef struct
     uint8_t effect;
     uint8_t color_count;
     uint8_t color_cycles;
-    uint8_t timing[6];
-    uint8_t args[5];
-    uint8_t colors[PROFILE_COLOR_COUNT * 3];
+    uint8_t timing[TIME_COUNT];
+    uint8_t args[ARG_COUNT];
+    uint8_t colors[COLOR_COUNT * 3];
 } __attribute__((packed)) device_profile;
 
 typedef struct
 {
-    device_profile devices[6];
+    device_profile devices[DEVICE_COUNT];
     uint8_t flags;
 } __attribute__((packed)) profile;
 
 typedef struct
 {
-    uint8_t brightness[6];
+    uint8_t brightness[DEVICE_COUNT];
     uint8_t profile_count;
     uint8_t n_profile;
     uint8_t leds_enabled;
     uint8_t fan_count;
     uint8_t auto_increment;
-    uint8_t fan_config[3];
+    uint8_t fan_config[MAX_FAN_COUNT];
     uint8_t profile_order[PROFILE_COUNT];
 } __attribute__((packed)) global_settings;
 

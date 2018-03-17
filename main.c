@@ -46,9 +46,9 @@ global_settings globals;
 #if (COMPILE_EFFECTS != 0)
 
 profile current_profile;
-uint16_t frames[6][6];
-uint8_t colors[6][PROFILE_COLOR_COUNT * 3];
-uint8_t backup_args[6][5];
+uint16_t frames[DEVICE_COUNT][TIME_COUNT];
+uint8_t colors[DEVICE_COUNT][COLOR_COUNT * 3];
+uint8_t backup_args[DEVICE_COUNT][ARG_COUNT];
 uint32_t auto_increment;
 
 #define fetch_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH)
@@ -110,15 +110,15 @@ uint8_t demo = 0;
 #if (COMPILE_EFFECTS != 0)
 void backup_all_args()
 {
-    for(uint8_t i = 0; i < 6; ++i)
+    for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
     {
-        memcpy(backup_args[i], current_profile.devices[i].args, 5);
+        memcpy(backup_args[i], current_profile.devices[i].args, ARG_COUNT);
     }
 }
 
 void convert_colors_for_brightness(uint8_t device)
 {
-    for(uint8_t j = 0; j < PROFILE_COLOR_COUNT; ++j)
+    for(uint8_t j = 0; j < COLOR_COUNT; ++j)
     {
         uint8_t index = j * 3;
         set_color_manual(colors[device] + index,
@@ -135,7 +135,7 @@ void convert_colors_for_brightness(uint8_t device)
 
 void convert_all_colors()
 {
-    for(uint8_t i = 0; i < 6; ++i)
+    for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
     {
         convert_colors_for_brightness(i);
     }
@@ -263,19 +263,17 @@ uint32_t autoincrement_to_frames(uint8_t time)
 
 void convert_to_frames(uint16_t *frames, uint8_t *times)
 {
-    frames[0] = time_to_frames(times[0]);
-    frames[1] = time_to_frames(times[1]);
-    frames[2] = time_to_frames(times[2]);
-    frames[3] = time_to_frames(times[3]);
-    frames[4] = time_to_frames(times[4]);
-    frames[5] = time_to_frames(times[5]);
+    for(uint8_t i = 0; i < TIME_COUNT; ++i)
+    {
+        frames[i] = time_to_frames(times[i]);
+    }
 }
 
 #if (COMPILE_EFFECTS != 0)
 
 void convert_all_frames()
 {
-    for(uint8_t i = 0; i < 6; ++i)
+    for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
     {
         convert_to_frames(frames[i], current_profile.devices[i].timing);
     }
