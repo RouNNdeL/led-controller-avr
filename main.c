@@ -108,6 +108,7 @@ uint8_t demo = 0;
 #endif /* (COMPILE_DEMOS != 0) */
 
 #if (COMPILE_EFFECTS != 0)
+
 void backup_all_args()
 {
     for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
@@ -880,7 +881,7 @@ int main(void)
                         }
                         else
                         {
-                            set_all_colors(fan_buf+i*FAN_LED_COUNT*3, 0, 0, 0, FAN_LED_COUNT, 1);
+                            set_all_colors(fan_buf + i * FAN_LED_COUNT * 3, 0, 0, 0, FAN_LED_COUNT, 1);
                         }
                     }
 

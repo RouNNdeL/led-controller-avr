@@ -8,7 +8,7 @@ uint8_t scale8(uint8_t i, uint8_t scale)
 {
     asm volatile(
 #define FASTLED_SCALE8_FIXED 0
-#if (FASTLED_SCALE8_FIXED==1)
+#if (FASTLED_SCALE8_FIXED == 1)
     // Multiply 8-bit i * 8-bit scale, giving 16-bit r1,r0
         "mul %0, %1          \n\t"
         // Add i to r0, possibly setting the carry flag
@@ -71,19 +71,19 @@ void set_all_colors(uint8_t *p_buf, uint8_t r, uint8_t g, uint8_t b, uint8_t cou
 void cross_fade(uint8_t *color, uint8_t *colors, uint8_t n_color, uint8_t m_color, uint8_t progress)
 {
     if(colors[n_color] > colors[m_color])
-        color[0] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * (uint16_t) progress / UINT8_MAX;
+        color[0] = colors[n_color] - scale8(colors[n_color++] - colors[m_color++], progress);
     else
-        color[0] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * (uint16_t) progress / UINT8_MAX;
+        color[0] = colors[n_color] + scale8(colors[m_color++] - colors[n_color++], progress);
 
     if(colors[n_color] > colors[m_color])
-        color[1] = colors[n_color] - (colors[n_color++] - colors[m_color++]) * (uint16_t) progress / UINT8_MAX;
+        color[1] = colors[n_color] - scale8(colors[n_color++] - colors[m_color++], progress);
     else
-        color[1] = colors[n_color] + (colors[m_color++] - colors[n_color++]) * (uint16_t) progress / UINT8_MAX;
+        color[1] = colors[n_color] + scale8(colors[m_color++] - colors[n_color++], progress);
 
     if(colors[n_color] > colors[m_color])
-        color[2] = colors[n_color] - (colors[n_color] - colors[m_color]) * (uint16_t) progress / UINT8_MAX;
+        color[2] = colors[n_color] - scale8(colors[n_color] - colors[m_color], progress);
     else
-        color[2] = colors[n_color] + (colors[m_color] - colors[n_color]) * (uint16_t) progress / UINT8_MAX;
+        color[2] = colors[n_color] + scale8(colors[m_color] - colors[n_color], progress);
 }
 
 void cross_fade_values(uint8_t *color, uint8_t r1, uint8_t g1, uint8_t b1, uint8_t r2, uint8_t g2, uint8_t b2,
@@ -452,7 +452,35 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
             }
             else
             {
-                //TODO: Implement SPECTRUM effect
+                //TODO: Add a smooth transition between sets of colors
+                uint8_t progress_per_led = UINT8_MAX / led_count * args[ARG_SPECTRUM_COLOR_COUNT];
+                uint16_t rotation_progress = times[TIME_ROTATION] ? ((uint32_t) (frame % times[TIME_ROTATION]) * UINT16_MAX) / times[TIME_ROTATION] : 0;
+                uint8_t current_progress = rotation_progress * args[ARG_SPECTRUM_COLOR_COUNT] / UINT8_MAX % UINT8_MAX;
+                uint8_t base_color = (frame / sum / color_cycles ) % (color_count / args[ARG_SPECTRUM_COLOR_COUNT]) * args[ARG_SPECTRUM_COLOR_COUNT];
+                uint8_t n_color = rotation_progress / (UINT16_MAX / args[ARG_SPECTRUM_COLOR_COUNT]);
+                uint8_t m_color = (n_color+1) % args[ARG_SPECTRUM_COLOR_COUNT];
+
+                for(uint8_t i = 0; i < led_count; ++i)
+                {
+                    uint8_t index = (i + start_led) % led_count * 3;
+
+                    if(args[ARG_BIT_PACK] & SPECTRUM_MODE)
+                        cross_fade(leds+index, colors, (base_color + n_color)*3, (base_color +m_color)*3, current_progress);
+                    else
+                        cross_fade_bright(leds+index, color_from_buf(colors+(base_color + n_color)*3),
+                                          color_from_buf(colors+(base_color + m_color)*3), current_progress);
+
+                    if(current_progress >= UINT8_MAX - progress_per_led)
+                    {
+                        n_color = (n_color + 1) % args[ARG_SPECTRUM_COLOR_COUNT];
+                        m_color = (m_color + 1) % args[ARG_SPECTRUM_COLOR_COUNT];
+                        current_progress = progress_per_led - (UINT8_MAX - current_progress);
+                    }
+                    else
+                    {
+                        current_progress+=progress_per_led;
+                    }
+                }
             }
             //</editor-fold>
         }
@@ -550,7 +578,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
             }
             //</editor-fold>
         }
-        if(times[TIME_ROTATION] && effect != RAINBOW)
+        if(times[TIME_ROTATION] && effect != RAINBOW && effect != SPECTRUM)
         {
             uint16_t rotation_progress =
                     ((uint32_t) (frame % times[TIME_ROTATION]) * UINT16_MAX) / times[TIME_ROTATION];
@@ -560,6 +588,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         }
         if(effect == RAINBOW)
         {
+            //TODO: Possibly replace with SPECTRUM (if it is faster)
             uint16_t rotation_progress = times[TIME_ROTATION] ?
                                          ((uint32_t) (frame % times[TIME_ROTATION]) * UINT16_MAX) / times[TIME_ROTATION]
                                                               : 0;
