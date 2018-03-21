@@ -1,7 +1,6 @@
 #include <avr/io.h>
 #include <string.h>
 #include "color_utils.h"
-#include "uart.h"
 
 /* Credit: https://github.com/FastLED/FastLED */
 uint8_t scale8(uint8_t i, uint8_t scale)
@@ -543,7 +542,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
             }
             //</editor-fold>
         }
-        if(times[TIME_ROTATION] && effect != RAINBOW && effect != SPECTRUM)
+        if(times[TIME_ROTATION] && effect != RAINBOW)
         {
             uint16_t rotation_progress =
                     ((uint32_t) (frame % times[TIME_ROTATION]) * UINT16_MAX) / times[TIME_ROTATION];
@@ -560,14 +559,13 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
             uint16_t led_progress_base = UINT16_MAX / led_count;
             for(uint8_t i = 0; i < led_count; ++i)
             {
-                uint8_t alt_index =
-                        (((args[ARG_BIT_PACK] & DIRECTION) ? i : led_count - i - 1) + start_led) % led_count * 3;
+                uint8_t index = (((args[ARG_BIT_PACK] & DIRECTION) ? i : led_count - i - 1) + start_led) % led_count * 3;
                 uint16_t d_progress =
                         (rotation_progress + i * led_progress_base) * args[ARG_RAINBOW_SOURCES] % UINT16_MAX;
                 if(args[ARG_BIT_PACK] & RAINBOW_MODE)
-                    rainbow_at_progress_full(leds + alt_index, d_progress, args[ARG_RAINBOW_BRIGHTNESS], 1);
+                    rainbow_at_progress_full(leds + index, d_progress, args[ARG_RAINBOW_BRIGHTNESS], 1);
                 else
-                    rainbow_at_progress(leds + alt_index, d_progress, args[ARG_RAINBOW_BRIGHTNESS], 1);
+                    rainbow_at_progress(leds + index, d_progress, args[ARG_RAINBOW_BRIGHTNESS], 1);
             }
         }
         //</editor-fold>
@@ -638,7 +636,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
 
         for(uint8_t i = 0; i < led_count; ++i)
         {
-            uint8_t index = (i + start_led) % led_count * 3;
+            uint8_t index = (((args[ARG_BIT_PACK] & DIRECTION) ? i : led_count - i - 1) + start_led) % led_count * 3;
 
             if(args[ARG_SPECTRUM_MODES] & (1 << run))
                 cross_fade(leds + index, colors, (base_color + n_color) * 3, (base_color + m_color) * 3,
@@ -677,7 +675,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
 
             for(uint8_t i = 0; i < led_count; ++i)
             {
-                uint8_t index = (i + start_led) % led_count * 3;
+                uint8_t index = (((args[ARG_BIT_PACK] & DIRECTION) ? i : led_count - i - 1) + start_led) % led_count * 3;
 
                 if(args[ARG_SPECTRUM_MODES] & (1 << run))
                     cross_fade(tmp_color, colors, (base_color + n_color) * 3, (base_color + m_color) * 3,
