@@ -626,8 +626,8 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         uint16_t d_time = frame % sum;
 
         //TODO: Fix rounding error that will cause the colors to go forward by 1 when near the color change
-        uint16_t rotation_progress = times[TIME_ROTATION] ? ((frame % 5000) * UINT16_MAX) /
-                                                            5000 : 0;
+        uint16_t rotation_progress = times[TIME_ROTATION] ? ((frame % times[TIME_ROTATION]) * UINT16_MAX) /
+                                                            times[TIME_ROTATION] : 0;
         uint8_t current_progress = rotation_progress * args[ARG_SPECTRUM_COLOR_COUNT] / UINT8_MAX % UINT8_MAX;
 
         /* We need to know the current color batch to properly use ARG_SPECTRUM_MODES bit array */
@@ -672,7 +672,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         {
             uint8_t fade_progress = (d_time - times[TIME_ON]) * UINT8_MAX / times[TIME_FADEOUT];
             uint8_t tmp_color[3];
-            
+
             run = (run + 1) % run_count;
             base_color = (base_color + args[ARG_SPECTRUM_COLOR_COUNT]) % color_count;
 
@@ -687,7 +687,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                     cross_fade_bright(tmp_color, color_from_buf(colors + (base_color + n_color) * 3),
                                       color_from_buf(colors + (base_color + m_color) * 3), current_progress);
 
-                cross_fade_values(leds+index, color_from_buf(leds+index), color_from_buf(tmp_color), fade_progress);
+                cross_fade_values(leds + index, color_from_buf(leds + index), color_from_buf(tmp_color), fade_progress);
 
 
                 if(current_progress >= UINT8_MAX - progress_per_led)
