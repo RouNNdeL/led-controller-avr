@@ -181,11 +181,13 @@ void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, ui
     /* Which LED is the start led */
     uint8_t led_offset = (rotation_progress / (UINT16_MAX / led_count)) % led_count;
     /* What's left from the previous LED */
-    uint8_t led_carry =
-            (uint32_t) rotation_progress * UINT8_MAX / (UINT16_MAX / led_count) - UINT8_MAX * led_offset;
+    uint8_t led_carry = (uint32_t) rotation_progress * UINT8_MAX / (UINT16_MAX / led_count) % UINT8_MAX;
     /* How many LEDs per piece (*255) */
     uint16_t current_leds = 0;
     uint8_t color = 0;
+
+    led_offset = (bit_pack & DIRECTION) ? led_offset : led_count - led_offset - 1;
+    led_carry = (bit_pack & DIRECTION) ? led_carry : UINT8_MAX - led_carry;
 
     for(uint8_t j = 0; j < led_count; ++j)
     {
@@ -195,8 +197,7 @@ void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, ui
         /* If we're at the first LED of a certain color and led_carry != 0 crossfade with the previous color */
         if(current_leds == 0 && led_carry && (bit_pack & SMOOTH))
         {
-            cross_fade(leds + index, colors, color * 3,
-                       ((color + color_count - 1) % color_count) * 3, led_carry);
+            cross_fade(leds + index, colors, color * 3, ((color + color_count - 1) % color_count) * 3, led_carry);
 
             current_leds = led_carry;
         }
@@ -209,29 +210,6 @@ void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, ui
             color = (color + 1) % color_count; /* Next color */
             current_leds = 0; /* Reset current counter */
             j--; /* Backtrack to crossfade that LED */
-        }
-    }
-
-    //Not the most effective, but gets the job done. 1st place for future performance improvements
-    if(bit_pack & DIRECTION)
-    {
-        uint8_t i = led_count - 1;
-        uint8_t j = 0;
-        while(i > j)
-        {
-            uint8_t index = i * 3;
-            uint8_t index2 = j * 3;
-            uint8_t r = leds[index];
-            uint8_t g = leds[index + 1];
-            uint8_t b = leds[index + 2];
-            leds[index] = leds[index2];
-            leds[index + 1] = leds[index2 + 1];
-            leds[index + 2] = leds[index2 + 2];
-            leds[index2] = r;
-            leds[index2 + 1] = g;
-            leds[index2 + 2] = b;
-            i--;
-            j++;
         }
     }
 }
@@ -618,6 +596,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
     }
     else if(effect == SPECTRUM)
     {
+        //<editor-fold desc="SPECTRUM">
         /* How much progress per one LED */
         uint8_t progress_per_led = UINT8_MAX / led_count * args[ARG_SPECTRUM_COLOR_COUNT];
         uint16_t sum = times[TIME_ON] + times[TIME_FADEOUT];
@@ -700,6 +679,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                 }
             }
         }
+        //</editor-fold>
     }
     else
     {
