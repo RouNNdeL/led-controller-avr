@@ -809,6 +809,7 @@ int main(void)
         if((PINA & PIN_BUTTON) && !(flags & FLAG_BUTTON))
         {
             button_frame = frame;
+            flags &= ~FLAG_DEBUG_PAUSED;
             flags |= FLAG_BUTTON;
         }
         else if(button_frame && !(PINA & PIN_BUTTON))
