@@ -25,6 +25,10 @@ extern void output_grb_fan(uint8_t *ptr, uint16_t count);
 #define FLAG_CSGO_ENABLED (1 << 4)
 #endif /* (COMPILE_CSGO != 0) */
 
+#if (COMPILE_DEBUG != 0)
+#define FLAG_DEBUG_PAUSED (1 << 5)
+#endif /* (COMPILE_DEBUG != 0) */
+
 volatile uint8_t flags = 0;
 //</editor-fold>
 
@@ -400,7 +404,7 @@ void process_uart()
                         uart_transmit(PROFILE_OVERFLOW);
                     }
 
-
+                    flags &= ~FLAG_DEBUG_PAUSED;
                     reset_uart();
                 }
                 //</editor-fold>
@@ -436,6 +440,7 @@ void process_uart()
 
                     uart_transmit(RECEIVE_SUCCESS);
 
+                    flags &= ~FLAG_DEBUG_PAUSED;
                     reset_uart();
                 }
                 //</editor-fold>
@@ -469,6 +474,7 @@ void process_uart()
 
                     uart_transmit(RECEIVE_SUCCESS);
 
+                    flags &= ~FLAG_DEBUG_PAUSED;
                     reset_uart();
                 }
                 //</editor-fold>
@@ -543,6 +549,7 @@ void process_uart()
                 //</editor-fold>
             }
             case FRAME_JUMP:
+            case DEBUG_SET_FRAME:
             {
                 if(!(uart_flags & UART_FLAG_RECEIVE))
                 {
@@ -572,9 +579,76 @@ void process_uart()
             case TEMP_DEVICE:
             {
                 uart_transmit(EFFECTS_DISABLED);
+
+                reset_uart();
                 break;
             }
 #endif /* (COMPILE_EFFECTS !=0) */
+#if (COMPILE_DEBUG != 0)
+            case DEBUG_PAUSE:
+            {
+                flags |= FLAG_DEBUG_PAUSED;
+                uart_transmit(RECEIVE_SUCCESS);
+
+                reset_uart();
+                break;
+            }
+            case DEBUG_RESUME:
+            {
+                flags &= ~FLAG_DEBUG_PAUSED;
+                uart_transmit(RECEIVE_SUCCESS);
+
+                reset_uart();
+                break;
+            }
+            case DEBUG_GET_FRAME:
+            {
+                transmit_bytes((uint8_t *) &frame, sizeof(uint32_t));
+
+                reset_uart();
+                break;
+            }
+            case DEBUG_INCREMENT_FRAME:
+            {
+                if(!(uart_flags & UART_FLAG_RECEIVE))
+                {
+                    uart_transmit(READY_TO_RECEIVE);
+                    uart_flags |= UART_FLAG_RECEIVE;
+                }
+                else if(uart_buffer_length >= sizeof(int32_t))
+                {
+                    int32_t increment;
+                    uart_flags |= UART_FLAG_LOCK;
+                    memcpy(&increment, (const void *) (uart_buffer), sizeof(int32_t));
+                    uart_flags &= ~UART_FLAG_LOCK;
+
+                    if(increment < 0 && frame < -increment)
+                    {
+                        frame = 0;
+                    }
+                    else
+                    {
+                        frame += increment;
+                    }
+                    flags |= FLAG_NEW_FRAME;
+                    uart_transmit(RECEIVE_SUCCESS);
+
+                    reset_uart();
+                }
+                break;
+            }
+#else
+            case DEBUG_PAUSE:
+            case DEBUG_RESUME:
+            case DEBUG_GET_FRAME:
+            case DEBUG_INCREMENT_FRAME:
+            {
+                uart_transmit(DEBUG_DISABLED);
+
+                reset_uart();
+                break;
+            }
+#endif /* (COMPILE_DEBUG != 0) */
             case DEMO_START_MUSIC:
             case DEMO_START_EFFECTS:
             {
@@ -584,6 +658,7 @@ void process_uart()
                 reset_uart();
 #else
                 uart_transmit(DEMOS_DISABLED);
+                reset_uart();
 #endif /* (COMPILE_DEMOS != 0) */
                 break;
             }
@@ -790,8 +865,6 @@ int main(void)
 
         if(flags & FLAG_NEW_FRAME)
         {
-            flags &= ~FLAG_NEW_FRAME;
-            update();
 
 #if (COMPILE_EFFECTS != 0)
             if(auto_increment && frame && frame % auto_increment == 0 && globals.leds_enabled)
@@ -1049,6 +1122,9 @@ int main(void)
                 flags &= ~FLAG_RESET;
             }
 #endif /* (COMPILE_BUTTONS != 0) */
+
+            flags &= ~FLAG_NEW_FRAME;
+            update();
         }
     }
 }
@@ -1057,8 +1133,11 @@ int main(void)
 
 ISR(TIMER3_COMPA_vect)
 {
-    frame++;
-    flags |= FLAG_NEW_FRAME;
+    if(!(flags & FLAG_DEBUG_PAUSED))
+    {
+        frame++;
+        flags |= FLAG_NEW_FRAME;
+    }
 }
 
 #if (COMPILE_UART != 0)

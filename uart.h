@@ -34,6 +34,12 @@
 #define BUFFER_OVERFLOW 0xE1
 #define PROFILE_OVERFLOW 0xE1
 
+#define DEBUG_PAUSE 0xF0
+#define DEBUG_RESUME 0xF1
+#define DEBUG_SET_FRAME 0xF2
+#define DEBUG_GET_FRAME 0xF3
+#define DEBUG_INCREMENT_FRAME 0xF4
+#define DEBUG_DISABLED 0xFE
 #define BAUD 9600
 
 #include <util/setbaud.h>

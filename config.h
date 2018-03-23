@@ -7,10 +7,15 @@
 #define COMPILE_UART 1
 #define COMPILE_BUTTONS 1
 #define COMPILE_EFFECTS 1
+#define COMPILE_DEBUG 1 /* Allow pausing the effect and seeking frame by frame */
 
 #if (COMPILE_EFFECTS == 0 && COMPILE_DEMOS == 0 && COMPILE_CSGO == 0)
 #    warning All intercations have been disabled, this state is undesirable in production
 #endif /* (COMPILE_EFFECTS == 0 && COMPILE_DEMOS == 0 && COMPILE_CSGO == 0) */
+
+#if (COMPILE_DEBUG != 0 && COMPILE_UART == 0)
+#    error Debugging has been enabled but UART has not. Debugging won't work without UART
+#endif /* (COMPILE_DEBUG != 0 && COMPILE_UART == 0) */
 
 /* Note: These change the color representation of a color */
 #define ACTUAL_BRIGHTNESS_DIGITAL 1 /* Whether to compile in use of log brightness function for WS2812B */
