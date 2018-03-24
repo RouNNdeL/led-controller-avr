@@ -28,7 +28,7 @@ extern void output_grb_fan(uint8_t *ptr, uint16_t count);
 #if (COMPILE_DEBUG != 0)
 #define FLAG_DEBUG_ENABLED (1 << 5)
 
-uint8_t debug_buffer[16];
+uint8_t debug_buffer[DEBUG_BUFFER_SIZE];
 #endif /* (COMPILE_DEBUG != 0) */
 
 volatile uint8_t flags = 0;

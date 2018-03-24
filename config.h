@@ -9,6 +9,8 @@
 #define COMPILE_EFFECTS 1
 #define COMPILE_DEBUG 1 /* Allow pausing the effect and seeking frame by frame */
 
+#define DEBUG_BUFFER_SIZE 26
+
 #if (COMPILE_EFFECTS == 0 && COMPILE_DEMOS == 0 && COMPILE_CSGO == 0)
 #    warning All intercations have been disabled, this state is undesirable in production
 #endif /* (COMPILE_EFFECTS == 0 && COMPILE_DEMOS == 0 && COMPILE_CSGO == 0) */
