@@ -576,11 +576,12 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         {
             uint8_t index = (((args[ARG_BIT_PACK] & DIRECTION) ? i : led_count - i - 1) + start_led) % led_count * 3;
 
-            if((i + args[ARG_PARTICLES_SIZE] + 1) * UINT8_MAX < particle_progress) /* We are behind the particle */
+            if((i + args[ARG_PARTICLES_SIZE] + 1) * UINT8_MAX <=
+               particle_progress) /* We are in front of the the particle */
             {
                 set_color_manual(leds + index, COLOR_BLACK);
             }
-            else if(i * UINT8_MAX < particle_progress)
+            else if(i * UINT8_MAX <= particle_progress)
             {
                 uint8_t p_index = i - (particle_progress / UINT8_MAX - args[ARG_PARTICLES_SIZE]);
                 uint8_t _colors[6];
@@ -592,7 +593,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
                 cross_fade(leds + index, _colors, 3, 0,
                            args[ARG_BIT_PACK] & SMOOTH ? particle_progress % UINT8_MAX : UINT8_MAX);
             }
-            else /* We are in front of the the particle */
+            else /* We are behind the particle */
             {
                 set_color_manual(leds + index, COLOR_BLACK);
             }
