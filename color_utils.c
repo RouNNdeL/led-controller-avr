@@ -1,6 +1,11 @@
 #include <avr/io.h>
 #include <string.h>
 #include "color_utils.h"
+#include "config.h"
+
+#if (COMPILE_DEBUG != 0)
+extern uint8_t debug_buffer[];
+#endif /* (COMPILE_DEBUG != 0) */
 
 /* Credit: https://github.com/FastLED/FastLED */
 uint8_t scale8(uint8_t i, uint8_t scale)
