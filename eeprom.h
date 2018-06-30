@@ -4,10 +4,6 @@
 #ifndef LEDCONTROLLER_EEPROM_H
 #define LEDCONTROLLER_EEPROM_H
 
-#ifndef __AVR_ATmega1284P__
-//#    error "This memory locations are only valid for an ATmega1284P"
-#endif
-
 typedef struct
 {
     uint8_t effect;
@@ -21,24 +17,30 @@ typedef struct
 typedef struct
 {
     device_profile devices[DEVICE_COUNT];
-    uint8_t flags;
 } __attribute__((packed)) profile;
 
 typedef struct
 {
     uint8_t brightness[DEVICE_COUNT];
+    uint8_t color[DEVICE_COUNT][3];
+    uint8_t flags[DEVICE_COUNT];
+    uint8_t current_device_profile[DEVICE_COUNT];
     uint8_t profile_count;
-    uint8_t n_profile;
-    uint8_t leds_enabled;
+    uint8_t current_profile;
     uint8_t fan_count;
     uint8_t auto_increment;
     uint8_t fan_config[MAX_FAN_COUNT];
-    uint8_t profile_order[PROFILE_COUNT];
+    uint8_t profiles[PROFILE_COUNT][DEVICE_COUNT];
+    uint8_t profile_flags[PROFILE_COUNT];
 } __attribute__((packed)) global_settings;
 
 #define GLOBALS_LENGTH sizeof(global_settings)
 #define DEVICE_LENGTH sizeof(device_profile)
 #define PROFILE_LENGTH sizeof(profile)
+
+#define DEVICE_FLAG_ENABLED (1 << 0)
+#define DEVICE_FLAG_EFFECT_ENABLED (1 << 1)
+#define DEVICE_FLAG_PROFILE_UPDATED (1 << 2)
 
 /**
  * When set to 1 the strip functions like a loop, otherwise both sides function like one strip
@@ -56,9 +58,9 @@ typedef struct
  */
 #define PROFILE_FLAG_FRONT_PC (1 << 2)
 
-#define DEVICE_PC 0
-#define DEVICE_GPU 1
-#define DEVICE_FAN 2
-#define DEVICE_STRIP DEVICE_FAN + MAX_FAN_COUNT
+#define DEVICE_INDEX_PC 0
+#define DEVICE_INDEX_GPU 1
+#define DEVICE_INDEX_FAN(n) 2+n
+#define DEVICE_INDEX_STRIP DEVICE_INDEX_FAN(MAX_FAN_COUNT)
 
 #endif //LEDCONTROLLER_EEPROM_H

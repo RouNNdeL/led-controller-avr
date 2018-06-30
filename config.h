@@ -12,11 +12,11 @@
 #define DEBUG_BUFFER_SIZE 26
 
 #if (COMPILE_EFFECTS == 0 && COMPILE_DEMOS == 0 && COMPILE_CSGO == 0)
-#    warning All intercations have been disabled, this state is undesirable in production
+#    warning "All intercations have been disabled, this state is undesirable in production"
 #endif /* (COMPILE_EFFECTS == 0 && COMPILE_DEMOS == 0 && COMPILE_CSGO == 0) */
 
 #if (COMPILE_DEBUG != 0 && COMPILE_UART == 0)
-#    error Debugging has been enabled but UART has not. Debugging won't work without UART
+#    error "Debugging has been enabled but UART has not. Debugging won't work without UART"
 #endif /* (COMPILE_DEBUG != 0 && COMPILE_UART == 0) */
 
 /* Note: These change the color representation of a color */
@@ -28,6 +28,7 @@
 #define BUTTON_OFF_FRAMES 1 * FPS
 #define BUTTON_RESET_FRAMES 5 * FPS
 
+#define DEVICE_PROFILE_COUNT 8
 #define PROFILE_COUNT 8
 #define COLOR_COUNT 16
 #define DEVICE_COUNT 6

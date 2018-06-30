@@ -9,6 +9,9 @@
 #include "config.h"
 #include "csgo.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
+
 extern void output_grb_strip(uint8_t *ptr, uint16_t count);
 
 extern void output_grb_fan(uint8_t *ptr, uint16_t count);
@@ -17,9 +20,6 @@ extern void output_grb_fan(uint8_t *ptr, uint16_t count);
 #define FLAG_NEW_FRAME (1 << 0)
 #define FLAG_BUTTON (1 << 1)
 #define FLAG_RESET (1 << 2)
-#if (COMPILE_EFFECTS != 0)
-#define FLAG_PROFILE_UPDATED (1 << 3)
-#endif /* (COMPILE_EFFECTS != 0) */
 
 #if (COMPILE_CSGO != 0)
 #define FLAG_CSGO_ENABLED (1 << 4)
@@ -41,29 +41,39 @@ volatile uint8_t flags = 0;
 //</editor-fold>
 
 //<editor-fold desc="Data">
-profile EEMEM profiles[PROFILE_COUNT];
+device_profile EEMEM device_profiles[DEVICE_COUNT][DEVICE_PROFILE_COUNT];
 global_settings EEMEM globals_addr;
 
-global_settings globals;
+global_settings globals = {
+        255, 255, 255, 255, 255, 255,
+        255, 255, 255,
+        255, 0, 255,
+        255, 0, 255,
+        255, 0, 0,
+        255, 0, 0,
+        255, 128, 128,
+        1, 1, 1, 1, 1, 1,
+        0, 0, 0, 0, 0, 0,
+        1, 0,
+        2, 0,
+        2, 2, 0
+};
 
 #define brightness(device, color) scale8(color, globals.brightness[device])
 #define save_globals() eeprom_update_block(&globals, &globals_addr, GLOBALS_LENGTH)
 
 #if (COMPILE_EFFECTS != 0)
 
-profile current_profile;
+device_profile current_profile[DEVICE_COUNT];
 uint16_t frames[DEVICE_COUNT][TIME_COUNT];
 uint8_t colors[DEVICE_COUNT][COLOR_COUNT * 3];
 uint8_t backup_args[DEVICE_COUNT][ARG_COUNT];
 uint32_t auto_increment;
 
-#define fetch_profile(p, n) eeprom_read_block(&p, &profiles[n], PROFILE_LENGTH)
-#define change_profile(n) eeprom_read_block(&current_profile, &profiles[n], PROFILE_LENGTH)
-#define save_profile(p, n) eeprom_update_block(&p, &profiles[n], PROFILE_LENGTH)
+#define fetch_profile(p, d, n) eeprom_read_block(&p, &device_profiles[d][n], DEVICE_LENGTH)
+#define save_profile(p, d, n) eeprom_update_block(&p, &device_profiles[d][n], DEVICE_LENGTH)
 
-#define increment_profile() globals.n_profile = (globals.n_profile+1)%globals.profile_count
-#define refresh_profile() change_profile(globals.profile_order[globals.n_profile]); convert_all_frames();\
-backup_all_args(); convert_all_colors()
+#define increment_profile() globals.current_profile = (globals.current_profile+1)%globals.profile_count
 
 #endif /* (COMPILE_EFFECTS != 0) */
 //</editor-fold>
@@ -71,7 +81,7 @@ backup_all_args(); convert_all_colors()
 //<editor-fold desc="Uart">
 #if (COMPILE_UART != 0)
 volatile uint8_t uart_control = 0x00;
-volatile uint8_t uart_buffer[64];
+volatile uint8_t uart_buffer[99];
 volatile uint8_t uart_buffer_length = 0;
 
 #define UART_FLAG_RECEIVE (1 << 0)
@@ -94,18 +104,18 @@ uint8_t gpu_buf[3];
 #define output_gpu(color) output_analog2(color[2], color[1], color[0])
 
 #if (COMPILE_EFFECTS != 0)
-#define simple(buf, n) simple_effect(current_profile.devices[n].effect, buf, frame + frames[n][TIME_DELAY], frames[n],\
-current_profile.devices[n].args, colors[n], current_profile.devices[n].color_count, current_profile.devices[n].color_cycles, 0)
+#define simple(buf, n) simple_effect(current_profile[n].effect, buf, frame + frames[n][TIME_DELAY], frames[n],\
+current_profile[n].args, colors[n], current_profile[n].color_count, current_profile[n].color_cycles, 0)
 
-#define digital(buf, count, offset, n) digital_effect(current_profile.devices[n].effect, buf, count, offset, frame + frames[n][TIME_DELAY], frames[n],\
-current_profile.devices[n].args, colors[n], current_profile.devices[n].color_count, current_profile.devices[n].color_cycles)
+#define digital(buf, count, offset, n) digital_effect(current_profile[n].effect, buf, count, offset, frame + frames[n][TIME_DELAY], frames[n],\
+current_profile[n].args, colors[n], current_profile[n].color_count, current_profile[n].color_cycles)
 #endif /* (COMPILE_EFFECTS != 0) */
 //</editor-fold>
 
 #if (COMPILE_CSGO != 0)
-game_state csgo_state = {0, 0, 0, 0, 0};
-game_state old_csgo_state = {0, 0, 0, 0, 0};
-csgo_control csgo_ctrl = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+game_state csgo_state = {0};
+game_state old_csgo_state = {0};
+csgo_control csgo_ctrl = {0};
 #endif /* (COMPILE_CSGO != 0) */
 
 volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run at 64 fps */
@@ -113,13 +123,31 @@ volatile uint32_t frame = 0; /* 32 bits is enough for 2 years of continuous run 
 uint8_t demo = 0;
 #endif /* (COMPILE_DEMOS != 0) */
 
+#define all_enabled() all_any_en_dis(0, 1)
+#define any_enabled() all_any_en_dis(1, 1)
+#define all_disabled() all_any_en_dis(0, 0)
+#define any_disabled() all_any_en_dis(1, 0)
+
+uint8_t all_any_en_dis(uint8_t any, uint8_t enabled)
+{
+    for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
+    {
+        if(globals.flags[i] & DEVICE_FLAG_ENABLED ^ enabled ^ any)
+            return any;
+    }
+    return !any;
+}
+
 #if (COMPILE_EFFECTS != 0)
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconversion"
 
 void backup_all_args()
 {
     for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
     {
-        memcpy(backup_args[i], current_profile.devices[i].args, ARG_COUNT);
+        memcpy(backup_args[i], current_profile[i].args, ARG_COUNT);
     }
 }
 
@@ -130,15 +158,17 @@ void convert_colors_for_brightness(uint8_t device)
         uint8_t index = j * 3;
         set_color_manual(colors[device] + index,
                          color_brightness(globals.brightness[device],
-                                          color_from_buf(current_profile.devices[device].colors + index)));
+                                          color_from_buf(current_profile[device].colors + index)));
     }
 
-    if(current_profile.devices[device].effect == RAINBOW)
+    if(current_profile[device].effect == RAINBOW)
     {
-        current_profile.devices[device].args[ARG_RAINBOW_BRIGHTNESS] =
-                brightness(device, backup_args[device][ARG_RAINBOW_BRIGHTNESS]);
+        current_profile[device].args[ARG_RAINBOW_BRIGHTNESS] =
+                brightness(device, current_profile[device].args[ARG_RAINBOW_BRIGHTNESS]);
     }
 }
+
+#pragma clang diagnostic pop
 
 void convert_all_colors()
 {
@@ -149,6 +179,9 @@ void convert_all_colors()
 }
 
 #endif /* (COMPILE_EFFECTS != 0) */
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconversion"
 
 void convert_bufs()
 {
@@ -175,6 +208,23 @@ void convert_bufs()
         strip_buf_full[index + 2] = actual_brightness(strip_buf_full[index + 2]);
     }
 #endif /* (ACTUAL_BRIGHTNESS_DIGITAL != 0) */
+}
+
+#pragma clang diagnostic pop
+
+void set_disabled()
+{
+    if(!(globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_ENABLED))
+        set_all_colors(strip_buf, COLOR_BLACK, STRIP_LED_COUNT, 1);
+    if(!(globals.flags[DEVICE_INDEX_PC] & DEVICE_FLAG_ENABLED))
+        set_color(pc_buf, 0, COLOR_BLACK);
+    if(!(globals.flags[DEVICE_INDEX_PC] & DEVICE_FLAG_ENABLED))
+        set_color(gpu_buf, 0, COLOR_BLACK);
+    for(uint8_t i = 0; i < MAX_FAN_COUNT; ++i)
+    {
+        if(!(globals.flags[DEVICE_INDEX_FAN(i)] & DEVICE_FLAG_ENABLED))
+            set_all_colors(fan_buf + FAN_LED_COUNT * i * 3, COLOR_BLACK, FAN_LED_COUNT, 1);
+    }
 }
 
 void output_analog1(uint8_t q1, uint8_t q2, uint8_t q3)
@@ -205,6 +255,7 @@ void output_analog2(uint8_t q4, uint8_t q5, uint8_t q6)
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
+
 uint16_t time_to_frames(uint8_t time)
 {
     if(time <= 80)
@@ -238,6 +289,7 @@ uint16_t time_to_frames(uint8_t time)
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
+
 uint32_t autoincrement_to_frames(uint8_t time)
 {
     if(time <= 60)
@@ -271,6 +323,7 @@ uint32_t autoincrement_to_frames(uint8_t time)
     if(time == 254) return 18000 * FPS;
     return 21600 * FPS;
 }
+
 #pragma clang diagnostic pop
 
 void convert_to_frames(uint16_t *frames, uint8_t *times)
@@ -287,8 +340,38 @@ void convert_all_frames()
 {
     for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
     {
-        convert_to_frames(frames[i], current_profile.devices[i].timing);
+        convert_to_frames(frames[i], current_profile[i].timing);
     }
+}
+
+void load_devices()
+{
+    for(uint8_t d = 0; d < DEVICE_COUNT; d++)
+    {
+        fetch_profile(current_profile[d], d, globals.current_device_profile[d]);
+    }
+    convert_all_frames();
+    backup_all_args();
+    convert_all_colors();
+}
+
+void load_profile(uint8_t n)
+{
+    for(uint8_t d = 0; d < DEVICE_COUNT; d++)
+    {
+        fetch_profile(current_profile[d], d, globals.profiles[n][d]);
+        globals.current_device_profile[d] = globals.profiles[n][d];
+    }
+    globals.profile_flags[globals.current_profile] = globals.profile_flags[n];
+    save_globals();
+}
+
+void refresh_profile()
+{
+    load_profile(globals.current_profile);
+    convert_all_frames();
+    backup_all_args();
+    convert_all_colors();
 }
 
 #endif /* (COMPILE_EFFECTS !=0) */
@@ -335,11 +418,11 @@ void init_avr()
 
     sei();                   /* Enable global interrupts */
 
-    set_all_colors(strip_buf_full, 0, 0, 0, STRIP_LED_COUNT + 1, 1);
-    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT, 1);
+    set_all_colors(strip_buf_full, COLOR_BLACK, STRIP_LED_COUNT + 1, 1);
+    set_all_colors(fan_buf, COLOR_BLACK, FAN_LED_COUNT, 1);
 
-    set_color(pc_buf, 0, 0, 0, 0);
-    set_color(gpu_buf, 0, 0, 0, 0);
+    set_color(pc_buf, 0, COLOR_BLACK);
+    set_color(gpu_buf, 0, COLOR_BLACK);
 }
 
 
@@ -349,11 +432,14 @@ void init_eeprom()
 #if (COMPILE_EFFECTS != 0)
     auto_increment = autoincrement_to_frames(globals.auto_increment);
 
-    refresh_profile();
+    load_devices();
 #endif /* (COMPILE_EFFECTS !=0) */
 }
 
 #if (COMPILE_UART != 0)
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconversion"
 
 void process_uart()
 {
@@ -372,37 +458,39 @@ void process_uart()
                 }
                 else if(uart_buffer_length >= DEVICE_LENGTH + 2)
                 {
-                    if(uart_buffer[0] < PROFILE_COUNT)
+                    /*
+                     * uart_buffer[0] - device_profile index
+                     * uart_buffer[1] - device index
+                     */
+                    if(uart_buffer[0] < DEVICE_PROFILE_COUNT)
                     {
                         /*
                          * Do not immediately write to EEPROM if the profile being modified is the current one,
                          * instead write to the variable itself and set an update flag.
                          */
-                        if(globals.profile_order[globals.n_profile] == uart_buffer[0])
+                        if(globals.current_device_profile[uart_buffer[1]] == uart_buffer[0])
                         {
                             /* Lock the buffer before reading it */
                             uart_flags |= UART_FLAG_LOCK;
-                            memcpy(&(current_profile.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2),
+                            memcpy(&(current_profile[uart_buffer[1]]), (const void *) (uart_buffer + 2),
                                    DEVICE_LENGTH);
                             uart_flags &= ~UART_FLAG_LOCK;
-                            convert_to_frames(frames[uart_buffer[1]], current_profile.devices[uart_buffer[1]].timing);
-                            memcpy(backup_args[uart_buffer[1]], current_profile.devices[uart_buffer[1]].args, 5);
+                            convert_to_frames(frames[uart_buffer[1]], current_profile[uart_buffer[1]].timing);
+                            memcpy(backup_args[uart_buffer[1]], current_profile[uart_buffer[1]].args, 5);
                             convert_colors_for_brightness(uart_buffer[1]);
 
-                            flags |= FLAG_PROFILE_UPDATED;
+                            globals.flags[uart_buffer[1]] |= DEVICE_FLAG_PROFILE_UPDATED;
                         }
                         else
                         {
-                            profile received;
-                            fetch_profile(received, uart_buffer[0]);
+                            device_profile received;
 
                             /* Lock the buffer before reading it */
                             uart_flags |= UART_FLAG_LOCK;
-                            memcpy(&(received.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2),
-                                   DEVICE_LENGTH);
+                            memcpy(&received, (const void *) (uart_buffer + 2), DEVICE_LENGTH);
                             uart_flags &= ~UART_FLAG_LOCK;
 
-                            save_profile(received, uart_buffer[0]);
+                            save_profile(received, uart_buffer[1], uart_buffer[0]);
                         }
                         uart_transmit(RECEIVE_SUCCESS);
                     }
@@ -430,16 +518,13 @@ void process_uart()
                 else if(uart_buffer_length >= GLOBALS_LENGTH)
                 {
                     /* Lock the buffer before reading it */
-                    uint8_t previous_profile = globals.n_profile;
-                    uint8_t previous_profile_index = globals.profile_order[globals.n_profile];
-                    uint8_t previous_enabled = globals.leds_enabled;
+                    uint8_t previous_profile = globals.current_profile;
                     uart_flags |= UART_FLAG_LOCK;
                     memcpy(&globals, (const void *) (uart_buffer), GLOBALS_LENGTH);
                     uart_flags &= ~UART_FLAG_LOCK;
 
                     save_globals();
-                    if(previous_profile != globals.n_profile || previous_enabled != globals.leds_enabled
-                       || previous_profile_index != globals.profile_order[globals.n_profile])
+                    if(previous_profile != globals.current_profile)
                     {
                         refresh_profile();
                         frame = 0;
@@ -467,21 +552,8 @@ void process_uart()
                 }
                 else if(uart_buffer_length >= 2)
                 {
-
-                    if(globals.profile_order[globals.n_profile] == uart_buffer[0])
-                    {
-                        current_profile.flags = uart_buffer[1];
-                        flags |= FLAG_PROFILE_UPDATED;
-                    }
-                    else
-                    {
-                        profile received;
-                        fetch_profile(received, uart_buffer[0]);
-
-                        received.flags = uart_buffer[1];
-
-                        save_profile(received, uart_buffer[0]);
-                    }
+                    globals.profile_flags[uart_buffer[0]] = uart_buffer[1];
+                    save_globals();
 
                     uart_transmit(RECEIVE_SUCCESS);
 
@@ -500,13 +572,17 @@ void process_uart()
                     uart_transmit(READY_TO_RECEIVE);
                     uart_flags |= UART_FLAG_RECEIVE;
                 }
-                else if(uart_buffer_length >= 1)
+                else if(uart_buffer_length >= 2)
                 {
-                    if(uart_buffer[0] < PROFILE_COUNT)
+                    /*
+                     * uart_buffer[0] - device_profile index
+                     * uart_buffer[1] - device index
+                     */
+                    if(uart_buffer[0] < DEVICE_PROFILE_COUNT)
                     {
                         /* Lock the buffer before reading it */
                         profile transmit;
-                        fetch_profile(transmit, uart_buffer[0]);
+                        fetch_profile(transmit, uart_buffer[1], uart_buffer[0]);
                         transmit_bytes((uint8_t *) &transmit, PROFILE_LENGTH);
                     }
                     else
@@ -527,10 +603,12 @@ void process_uart()
             }
             case SAVE_EXPLICIT:
             {
-                if(flags & FLAG_PROFILE_UPDATED)
+                for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
                 {
-                    save_profile(current_profile, globals.profile_order[globals.n_profile]);
-                    flags &= ~FLAG_PROFILE_UPDATED;
+                    if(globals.flags[i] & DEVICE_FLAG_PROFILE_UPDATED)
+                        save_profile(current_profile[i], i, globals.current_device_profile[i]);
+                    globals.flags[i] &= ~DEVICE_FLAG_PROFILE_UPDATED;
+
                 }
                 uart_transmit(RECEIVE_SUCCESS);
 
@@ -549,7 +627,7 @@ void process_uart()
                 {
                     /* Lock the buffer before reading it */
                     uart_flags |= UART_FLAG_LOCK;
-                    memcpy(&(current_profile.devices[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
+                    memcpy(&(current_profile[uart_buffer[1]]), (const void *) (uart_buffer + 2), DEVICE_LENGTH);
                     uart_flags &= ~UART_FLAG_LOCK;
 
                     convert_all_frames();
@@ -807,10 +885,15 @@ void process_uart()
     }
 }
 
+#pragma clang diagnostic pop
+
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "ImplicitIntegerAndEnumConversion"
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #endif /* (COMPILE_UART != 0) */
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconversion"
 
 int main(void)
 {
@@ -843,28 +926,41 @@ int main(void)
             if(time > BUTTON_MIN_FRAMES)
             {
 #if (COMPILE_EFFECTS != 0)
-                if(flags & FLAG_PROFILE_UPDATED)
+                for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
                 {
-                    save_profile(current_profile, globals.profile_order[globals.n_profile]);
-                    flags &= ~FLAG_PROFILE_UPDATED;
+                    if(globals.flags[i] & DEVICE_FLAG_PROFILE_UPDATED)
+                        save_profile(current_profile[i], i, globals.current_device_profile[i]);
                 }
 #endif /* (COMPILE_EFFECTS != 0) */
 
-                if(time < BUTTON_OFF_FRAMES && globals.leds_enabled)
+                if(time < BUTTON_OFF_FRAMES)
                 {
-                    save_globals();
+                    if(any_enabled())
+                    {
+                        save_globals();
 #if (COMPILE_EFFECTS != 0)
-                    increment_profile();
-                    refresh_profile();
+                        increment_profile();
+                        refresh_profile();
 #endif /* (COMPILE_EFFECTS != 0) */
+                        frame = 0;
+                    }
+                    else
+                    {
+                        for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
+                        {
+                            globals.flags[i] |= DEVICE_FLAG_ENABLED;
+                        }
+                    }
 #if (COMPILE_UART != 0)
                     uart_transmit(GLOBALS_UPDATED);
 #endif /* (COMPILE_UART != 0) */
-                    frame = 0;
                 }
                 else if(time < BUTTON_RESET_FRAMES)
                 {
-                    globals.leds_enabled = !globals.leds_enabled;
+                    for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
+                    {
+                        globals.flags[i] &= ~DEVICE_FLAG_ENABLED;
+                    }
                     save_globals();
 #if (COMPILE_UART != 0)
                     uart_transmit(GLOBALS_UPDATED);
@@ -893,12 +989,13 @@ int main(void)
         {
 
 #if (COMPILE_EFFECTS != 0)
-            if(auto_increment && frame && frame % auto_increment == 0 && globals.leds_enabled)
+            if(auto_increment && frame && frame % auto_increment == 0 && all_enabled())
             {
-                if(flags & FLAG_PROFILE_UPDATED)
+                for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
                 {
-                    save_profile(current_profile, globals.profile_order[globals.n_profile]);
-                    flags &= ~FLAG_PROFILE_UPDATED;
+                    if(globals.flags[i] & DEVICE_FLAG_PROFILE_UPDATED)
+                        save_profile(current_profile[i], i, globals.current_device_profile[i]);
+                    globals.flags[i] &= ~DEVICE_FLAG_PROFILE_UPDATED;
                 }
                 increment_profile();
                 refresh_profile();
@@ -937,177 +1034,88 @@ int main(void)
 #if (COMPILE_CSGO != 0)
             if(flags & FLAG_CSGO_ENABLED)
             {
-                if(globals.leds_enabled)
-                {
-                    process_csgo(&csgo_ctrl, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf,
-                                 pc_buf,
-                                 strip_buf);
+                process_csgo(&csgo_ctrl, &csgo_state, &old_csgo_state, fan_buf, globals.fan_config[0], gpu_buf,
+                             pc_buf,
+                             strip_buf);
 
-                    csgo_increment_frames();
-
-                    convert_bufs();
-                }
-                else
-                {
-                    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT * globals.fan_count, 1);
-                    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT, 1);
-
-                    set_color(pc_buf, 0, 0, 0, 0);
-                    set_color(gpu_buf, 0, 0, 0, 0);
-                }
+                csgo_increment_frames();
+                set_disabled();
+                convert_bufs();
             }
             else
             {
 #endif /* (COMPILE_CSGO != 0) */
-#if (COMPILE_EFFECTS != 0)
-                if(globals.leds_enabled)
+
+                if(globals.brightness[DEVICE_INDEX_PC] && globals.flags[DEVICE_INDEX_PC] & DEVICE_FLAG_ENABLED &&
+                   globals.flags[DEVICE_INDEX_PC] & DEVICE_FLAG_EFFECT_ENABLED)
                 {
-                    if(globals.brightness[DEVICE_PC])
-                        simple(pc_buf, DEVICE_PC);
-                    else
-                        set_color(pc_buf, 0, 0, 0, 0);
+#if (COMPILE_EFFECTS != 0)
+                    simple(pc_buf, DEVICE_INDEX_PC);
+#endif
+                }
+                else if(globals.brightness[DEVICE_INDEX_PC] && globals.flags[DEVICE_INDEX_PC] & DEVICE_FLAG_ENABLED)
+                    set_color(pc_buf, 0, color_from_buf(globals.color[DEVICE_INDEX_PC]));
+                else
+                    set_color(pc_buf, 0, COLOR_BLACK);
 
-                    if(globals.brightness[DEVICE_GPU])
-                        simple(gpu_buf, DEVICE_GPU);
-                    else
-                        set_color(gpu_buf, 0, 0, 0, 0);
+                if(globals.brightness[DEVICE_INDEX_GPU] && globals.flags[DEVICE_INDEX_GPU] & DEVICE_FLAG_ENABLED &&
+                   globals.flags[DEVICE_INDEX_GPU] & DEVICE_FLAG_EFFECT_ENABLED)
+                {
+#if (COMPILE_EFFECTS != 0)
+                    simple(gpu_buf, DEVICE_INDEX_GPU);
+#endif
+                }
+                else if(globals.brightness[DEVICE_INDEX_GPU] && globals.flags[DEVICE_INDEX_GPU] & DEVICE_FLAG_ENABLED)
+                    set_color(gpu_buf, 0, color_from_buf(globals.color[DEVICE_INDEX_GPU]));
+                else
+                    set_color(gpu_buf, 0, COLOR_BLACK);
 
-                    for(uint8_t i = 0; i < globals.fan_count; ++i)
+                for(uint8_t i = 0; i < globals.fan_count; ++i)
+                {
+                    uint8_t *index = fan_buf + FAN_LED_COUNT * i * 3;
+                    if(globals.brightness[DEVICE_INDEX_FAN(i)] &&
+                       globals.flags[DEVICE_INDEX_FAN(i)] & DEVICE_FLAG_ENABLED &&
+                       globals.flags[DEVICE_INDEX_FAN(i)] & DEVICE_FLAG_EFFECT_ENABLED)
                     {
-                        if(globals.brightness[DEVICE_FAN + i])
-                        {
-                            digital(fan_buf + FAN_LED_COUNT * i * 3, FAN_LED_COUNT, globals.fan_config[i],
-                                    DEVICE_FAN + i);
-                        }
-                        else
-                        {
-                            set_all_colors(fan_buf + i * FAN_LED_COUNT * 3, 0, 0, 0, FAN_LED_COUNT, 1);
-                        }
+#if (COMPILE_EFFECTS != 0)
+                        digital(index, FAN_LED_COUNT, globals.fan_config[i], DEVICE_INDEX_FAN(i));
+#endif
                     }
-
-                    //<editor-fold desc="Strip calculations and transformations">
-                    if(current_profile.flags & PROFILE_FLAG_FRONT_PC)
+                    else if(globals.brightness[DEVICE_INDEX_FAN(i)] &&
+                            globals.flags[DEVICE_INDEX_FAN(i)] & DEVICE_FLAG_ENABLED)
                     {
-                        //<editor-fold desc="Front as PC">
-                        for(uint8_t i = 0; i < STRIP_FRONT_LED_COUNT; ++i)
-                        {
-                            uint8_t index = i * 3;
-                            strip_buf[STRIP_SIDE_LED_COUNT * 6 + index++] = pc_buf[1];
-                            strip_buf[STRIP_SIDE_LED_COUNT * 6 + index++] = pc_buf[0];
-                            strip_buf[STRIP_SIDE_LED_COUNT * 6 + index] = pc_buf[2];
-                        }
-                        if(globals.brightness[DEVICE_STRIP])
-                        {
-                            if(current_profile.flags & PROFILE_FLAG_STRIP_MODE)
-                            {
-                                digital(strip_buf, STRIP_SIDE_LED_COUNT * 2, 0, DEVICE_STRIP);
-                            }
-                            else
-                            {
-                                digital(strip_buf, STRIP_SIDE_LED_COUNT, 0, DEVICE_STRIP);
-                                for(uint8_t i = 0; i < STRIP_SIDE_LED_COUNT; ++i)
-                                {
-                                    uint8_t index = i * 3;
-                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 3] = strip_buf[index];
-                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 2] = strip_buf[index + 1];
-                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 1] = strip_buf[index + 2];
-                                }
-                            }
-                        }
-                        else
-                        {
-                            set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT, 1);
-                        }
-                        //</editor-fold>
+                        set_all_colors(index, color_from_buf(globals.color[DEVICE_INDEX_FAN(i)]), FAN_LED_COUNT, 1);
                     }
-                    else if(globals.brightness[DEVICE_STRIP])
+                    else
                     {
-                        if(current_profile.flags & PROFILE_FLAG_STRIP_MODE)
+                        set_all_colors(index, COLOR_BLACK, FAN_LED_COUNT, 1);
+                    }
+                }
+
+                //<editor-fold desc="Strip calculations and transformations">
+                if(globals.profile_flags[globals.current_profile] & PROFILE_FLAG_FRONT_PC)
+                {
+                    //<editor-fold desc="Front as PC">
+                    for(uint8_t i = 0; i < STRIP_FRONT_LED_COUNT; ++i)
+                    {
+                        uint8_t index = i * 3;
+                        strip_buf[STRIP_SIDE_LED_COUNT * 6 + index++] = pc_buf[1];
+                        strip_buf[STRIP_SIDE_LED_COUNT * 6 + index++] = pc_buf[0];
+                        strip_buf[STRIP_SIDE_LED_COUNT * 6 + index] = pc_buf[2];
+                    }
+                    if(globals.brightness[DEVICE_INDEX_STRIP] &&
+                       globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_ENABLED &&
+                       globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_EFFECT_ENABLED)
+                    {
+#if (COMPILE_EFFECTS != 0)
+                        if(globals.profile_flags[globals.current_profile] & PROFILE_FLAG_STRIP_MODE)
                         {
-                            //<editor-fold desc="Loop">
-                            digital(strip_buf, STRIP_VIRTUAL_COUNT, 0, DEVICE_STRIP);
 
-                            uint8_t front_virtual[STRIP_VIRTUAL_COUNT * 3];
-                            /* This shifts the second side of the strip forward by STRIP_FRONT_LED_COUNT */
-                            memcpy(front_virtual, strip_buf + STRIP_SIDE_LED_COUNT * 3, STRIP_VIRTUAL_COUNT * 3);
-                            memmove(strip_buf + STRIP_SIDE_LED_COUNT * 3,
-                                    strip_buf + (STRIP_SIDE_LED_COUNT + STRIP_FRONT_VIRTUAL_COUNT) * 3,
-                                    STRIP_SIDE_LED_COUNT * 3);
-
-                            uint8_t front[STRIP_FRONT_LED_COUNT * 3];
-                            for(uint8_t i = 0; i < STRIP_FRONT_LED_COUNT / 2; ++i)
-                            {
-                                uint8_t index = i * 3;
-                                set_color_manual(front + index, color_from_buf(front_virtual + index * 2));
-                            }
-
-                            uint8_t front_half = STRIP_FRONT_LED_COUNT / 2 * 3;
-                            front[front_half] = (front_virtual[front_half * 2] + front_virtual[front_half * 2 - 3]) / 2;
-                            front[front_half + 1] =
-                                    (front_virtual[front_half * 2 + 1] + front_virtual[front_half * 2 - 2]) / 2;
-                            front[front_half + 2] =
-                                    (front_virtual[front_half * 2 + 2] + front_virtual[front_half * 2 - 1]) / 2;
-
-                            for(uint8_t i = STRIP_FRONT_LED_COUNT / 2 + 1; i < STRIP_FRONT_LED_COUNT; ++i)
-                            {
-                                uint8_t index = i * 3;
-                                set_color_manual(front + index, color_from_buf(front_virtual + index * 2 - 3));
-                            }
-
-                            uint8_t i = STRIP_FRONT_LED_COUNT - 1;
-                            uint8_t j = 0;
-                            while(i > j)
-                            {
-                                uint8_t index = i * 3;
-                                uint8_t index2 = j * 3;
-                                uint8_t r = front[index];
-                                uint8_t g = front[index + 1];
-                                uint8_t b = front[index + 2];
-                                front[index] = front[index2];
-                                front[index + 1] = front[index2 + 1];
-                                front[index + 2] = front[index2 + 2];
-                                front[index2] = r;
-                                front[index2 + 1] = g;
-                                front[index2 + 2] = b;
-                                i--;
-                                j++;
-                            }
-
-                            memcpy(strip_buf + STRIP_SIDE_LED_COUNT * 6, front, STRIP_FRONT_LED_COUNT * 3);
-                            //</editor-fold>
+                            digital(strip_buf, STRIP_SIDE_LED_COUNT * 2, 0, DEVICE_INDEX_STRIP);
                         }
                         else
                         {
-                            //<editor-fold desc="Single strip">
-                            if(current_profile.flags & PROFILE_FLAG_FRONT_MODE)
-                            {
-                                digital(strip_buf, STRIP_SIDE_LED_COUNT, 0, DEVICE_STRIP);
-                                set_all_colors(strip_buf + STRIP_SIDE_LED_COUNT * 6,
-                                               color_from_buf(strip_buf + STRIP_SIDE_LED_COUNT * 3 - 3),
-                                               STRIP_FRONT_LED_COUNT, 0);
-                            }
-                            else
-                            {
-                                uint8_t front_half = (STRIP_FRONT_LED_COUNT + 1) / 2;
-                                digital(strip_buf, STRIP_SIDE_LED_COUNT + front_half, 0, DEVICE_STRIP);
-                                for(uint8_t i = 0; i < front_half; ++i)
-                                {
-                                    uint8_t index = i * 3;
-                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 + index] =
-                                            strip_buf[STRIP_SIDE_LED_COUNT * 3 + index];
-                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 + index + 1] =
-                                            strip_buf[STRIP_SIDE_LED_COUNT * 3 + index + 1];
-                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 + index + 2] =
-                                            strip_buf[STRIP_SIDE_LED_COUNT * 3 + index + 2];
-
-                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 + STRIP_FRONT_LED_COUNT * 3 - index - 3] =
-                                            strip_buf[STRIP_SIDE_LED_COUNT * 3 + index];
-                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 + STRIP_FRONT_LED_COUNT * 3 - index - 2] =
-                                            strip_buf[STRIP_SIDE_LED_COUNT * 3 + index + 1];
-                                    strip_buf[STRIP_SIDE_LED_COUNT * 6 + STRIP_FRONT_LED_COUNT * 3 - index - 1] =
-                                            strip_buf[STRIP_SIDE_LED_COUNT * 3 + index + 2];
-                                }
-                            }
+                            digital(strip_buf, STRIP_SIDE_LED_COUNT, 0, DEVICE_INDEX_STRIP);
                             for(uint8_t i = 0; i < STRIP_SIDE_LED_COUNT; ++i)
                             {
                                 uint8_t index = i * 3;
@@ -1115,53 +1123,163 @@ int main(void)
                                 strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 2] = strip_buf[index + 1];
                                 strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 1] = strip_buf[index + 2];
                             }
-                            //</editor-fold>
                         }
+#endif
+                    }
+                    else if(globals.brightness[DEVICE_INDEX_STRIP] &&
+                            globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_ENABLED)
+                    {
+                        set_all_colors(strip_buf, color_from_buf(globals.color[DEVICE_INDEX_STRIP]), STRIP_LED_COUNT,
+                                       1);
                     }
                     else
                     {
-                        set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT, 1);
+                        set_all_colors(strip_buf, COLOR_BLACK, STRIP_LED_COUNT, 1);
                     }
                     //</editor-fold>
+                }
+                else if(globals.brightness[DEVICE_INDEX_STRIP] &&
+                        globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_ENABLED &&
+                        globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_EFFECT_ENABLED)
+                {
+#if (COMPILE_EFFECTS != 0)
+                    if(globals.profile_flags[globals.current_profile] & PROFILE_FLAG_STRIP_MODE)
+                    {
+                        //<editor-fold desc="Loop">
+                        digital(strip_buf, STRIP_VIRTUAL_COUNT, 0, DEVICE_INDEX_STRIP);
 
-                    convert_bufs();
+                        uint8_t front_virtual[STRIP_VIRTUAL_COUNT * 3];
+                        /* This shifts the second side of the strip forward by STRIP_FRONT_LED_COUNT */
+                        memcpy(front_virtual, strip_buf + STRIP_SIDE_LED_COUNT * 3, STRIP_VIRTUAL_COUNT * 3);
+                        memmove(strip_buf + STRIP_SIDE_LED_COUNT * 3,
+                                strip_buf + (STRIP_SIDE_LED_COUNT + STRIP_FRONT_VIRTUAL_COUNT) * 3,
+                                STRIP_SIDE_LED_COUNT * 3);
+
+                        uint8_t front[STRIP_FRONT_LED_COUNT * 3];
+                        for(uint8_t i = 0; i < STRIP_FRONT_LED_COUNT / 2; ++i)
+                        {
+                            uint8_t index = i * 3;
+                            set_color_manual(front + index, color_from_buf(front_virtual + index * 2));
+                        }
+
+                        uint8_t front_half = STRIP_FRONT_LED_COUNT / 2 * 3;
+                        front[front_half] = (front_virtual[front_half * 2] + front_virtual[front_half * 2 - 3]) / 2;
+                        front[front_half + 1] =
+                                (front_virtual[front_half * 2 + 1] + front_virtual[front_half * 2 - 2]) / 2;
+                        front[front_half + 2] =
+                                (front_virtual[front_half * 2 + 2] + front_virtual[front_half * 2 - 1]) / 2;
+
+                        for(uint8_t i = STRIP_FRONT_LED_COUNT / 2 + 1; i < STRIP_FRONT_LED_COUNT; ++i)
+                        {
+                            uint8_t index = i * 3;
+                            set_color_manual(front + index, color_from_buf(front_virtual + index * 2 - 3));
+                        }
+
+                        uint8_t i = STRIP_FRONT_LED_COUNT - 1;
+                        uint8_t j = 0;
+                        while(i > j)
+                        {
+                            uint8_t index = i * 3;
+                            uint8_t index2 = j * 3;
+                            uint8_t r = front[index];
+                            uint8_t g = front[index + 1];
+                            uint8_t b = front[index + 2];
+                            front[index] = front[index2];
+                            front[index + 1] = front[index2 + 1];
+                            front[index + 2] = front[index2 + 2];
+                            front[index2] = r;
+                            front[index2 + 1] = g;
+                            front[index2 + 2] = b;
+                            i--;
+                            j++;
+                        }
+
+                        memcpy(strip_buf + STRIP_SIDE_LED_COUNT * 6, front, STRIP_FRONT_LED_COUNT * 3);
+                        //</editor-fold>
+                    }
+                    else
+                    {
+                        //<editor-fold desc="Single strip">
+                        if(globals.profile_flags[globals.current_profile] & PROFILE_FLAG_FRONT_MODE)
+                        {
+                            digital(strip_buf, STRIP_SIDE_LED_COUNT, 0, DEVICE_INDEX_STRIP);
+                            set_all_colors(strip_buf + STRIP_SIDE_LED_COUNT * 6,
+                                           color_from_buf(strip_buf + STRIP_SIDE_LED_COUNT * 3 - 3),
+                                           STRIP_FRONT_LED_COUNT, 0);
+                        }
+                        else
+                        {
+                            uint8_t front_half = (STRIP_FRONT_LED_COUNT + 1) / 2;
+                            digital(strip_buf, STRIP_SIDE_LED_COUNT + front_half, 0, DEVICE_INDEX_STRIP);
+                            for(uint8_t i = 0; i < front_half; ++i)
+                            {
+                                uint8_t index = i * 3;
+                                strip_buf[STRIP_SIDE_LED_COUNT * 6 + index] =
+                                        strip_buf[STRIP_SIDE_LED_COUNT * 3 + index];
+                                strip_buf[STRIP_SIDE_LED_COUNT * 6 + index + 1] =
+                                        strip_buf[STRIP_SIDE_LED_COUNT * 3 + index + 1];
+                                strip_buf[STRIP_SIDE_LED_COUNT * 6 + index + 2] =
+                                        strip_buf[STRIP_SIDE_LED_COUNT * 3 + index + 2];
+
+                                strip_buf[STRIP_SIDE_LED_COUNT * 6 + STRIP_FRONT_LED_COUNT * 3 - index - 3] =
+                                        strip_buf[STRIP_SIDE_LED_COUNT * 3 + index];
+                                strip_buf[STRIP_SIDE_LED_COUNT * 6 + STRIP_FRONT_LED_COUNT * 3 - index - 2] =
+                                        strip_buf[STRIP_SIDE_LED_COUNT * 3 + index + 1];
+                                strip_buf[STRIP_SIDE_LED_COUNT * 6 + STRIP_FRONT_LED_COUNT * 3 - index - 1] =
+                                        strip_buf[STRIP_SIDE_LED_COUNT * 3 + index + 2];
+                            }
+                        }
+                        for(uint8_t i = 0; i < STRIP_SIDE_LED_COUNT; ++i)
+                        {
+                            uint8_t index = i * 3;
+                            strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 3] = strip_buf[index];
+                            strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 2] = strip_buf[index + 1];
+                            strip_buf[STRIP_SIDE_LED_COUNT * 6 - index - 1] = strip_buf[index + 2];
+                        }
+                        //</editor-fold>
+                    }
+#endif
+                }
+                else if(globals.brightness[DEVICE_INDEX_STRIP] &&
+                        globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_ENABLED)
+                {
+                    set_all_colors(strip_buf, color_from_buf(globals.color[DEVICE_INDEX_STRIP]), STRIP_LED_COUNT, 1);
                 }
                 else
                 {
-                    set_all_colors(fan_buf, 0, 0, 0, FAN_LED_COUNT * globals.fan_count, 1);
-                    set_all_colors(strip_buf, 0, 0, 0, STRIP_LED_COUNT, 1);
-
-                    set_color(pc_buf, 0, 0, 0, 0);
-                    set_color(gpu_buf, 0, 0, 0, 0);
+                    set_all_colors(strip_buf, COLOR_BLACK, STRIP_LED_COUNT, 1);
                 }
-#endif /* (COMPILE_EFFECTS != 0) */
-#if (COMPILE_CSGO != 0)
+                //</editor-fold>
+
+                convert_bufs();
             }
+#if (COMPILE_CSGO != 0)
+        }
 #endif /* (COMPILE_CSGO != 0) */
 #if (COMPILE_DEMOS != 0)
-            }
+        }
 #endif /* (COMPILE_DEMOS != 0) */
 
 #if (COMPILE_BUTTONS != 0)
-            if((flags & FLAG_RESET) && frame > reset_frame)
-            {
-                PORTD &= ~PIN_RESET;
-                flags &= ~FLAG_RESET;
-            }
+        if((flags & FLAG_RESET) && frame > reset_frame)
+        {
+            PORTD &= ~PIN_RESET;
+            flags &= ~FLAG_RESET;
+        }
 #endif /* (COMPILE_BUTTONS != 0) */
-
 #if (COMPILE_DEBUG != 0)
-            if(!(uart_flags & UART_FLAG_RECEIVE) && (flags & FLAG_DEBUG_ENABLED || !(frame % (FPS / 2))))
-            {
-                uart_transmit(DEBUG_NEW_INFO);
-            }
+        if(!(uart_flags & UART_FLAG_RECEIVE) && (flags & FLAG_DEBUG_ENABLED || !(frame % (FPS / 2))))
+        {
+            uart_transmit(DEBUG_NEW_INFO);
+        }
 #endif /* (COMPILE_DEBUG != 0) */
 
-            flags &= ~FLAG_NEW_FRAME;
-            update();
-        }
+        flags &= ~FLAG_NEW_FRAME;
+        update();
     }
 }
+
+#pragma clang diagnostic pop
 
 #pragma clang diagnostic pop
 
@@ -1171,8 +1289,8 @@ ISR(TIMER3_COMPA_vect)
     if(!(flags & FLAG_DEBUG_ENABLED))
     {
 #endif /* (COMPILE_DEBUG != 0) */
-        frame++;
-        flags |= FLAG_NEW_FRAME;
+    frame++;
+    flags |= FLAG_NEW_FRAME;
 #if (COMPILE_DEBUG != 0)
     }
 #endif /* (COMPILE_DEBUG != 0) */
@@ -1199,3 +1317,5 @@ ISR(USART0_RX_vect)
 }
 
 #endif /* (COMPILE_UART != 0) */
+
+#pragma clang diagnostic pop
