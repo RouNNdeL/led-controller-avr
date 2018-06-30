@@ -188,7 +188,7 @@ void convert_bufs()
     /* Convert to actual brightness */
 
 #if (ACTUAL_BRIGHTNESS_DIGITAL != 0)
-    for(uint8_t i = 0; i < FAN_LED_COUNT; ++i)
+    for(uint8_t i = 0; i < FAN_LED_COUNT * globals.fan_count; ++i)
     {
         uint8_t index = i * 3;
 
