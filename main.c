@@ -203,6 +203,8 @@ void output_analog2(uint8_t q4, uint8_t q5, uint8_t q6)
 #endif /* (ACTUAL_BRIGHTNESS_ANALOG2 != 0) */
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
 uint16_t time_to_frames(uint8_t time)
 {
     if(time <= 80)
@@ -232,6 +234,10 @@ uint16_t time_to_frames(uint8_t time)
     return (60 * time - 14400) * FPS;
 }
 
+#pragma clang diagnostic pop
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsign-conversion"
 uint32_t autoincrement_to_frames(uint8_t time)
 {
     if(time <= 60)
@@ -265,7 +271,6 @@ uint32_t autoincrement_to_frames(uint8_t time)
     if(time == 254) return 18000 * FPS;
     return 21600 * FPS;
 }
-
 #pragma clang diagnostic pop
 
 void convert_to_frames(uint16_t *frames, uint8_t *times)
@@ -971,7 +976,8 @@ int main(void)
                     {
                         if(globals.brightness[DEVICE_FAN + i])
                         {
-                            digital(fan_buf + FAN_LED_COUNT * i, FAN_LED_COUNT, globals.fan_config[i], DEVICE_FAN + i);
+                            digital(fan_buf + FAN_LED_COUNT * i * 3, FAN_LED_COUNT, globals.fan_config[i],
+                                    DEVICE_FAN + i);
                         }
                         else
                         {
