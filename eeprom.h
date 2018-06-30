@@ -30,7 +30,7 @@ typedef struct
     uint8_t fan_count;
     uint8_t auto_increment;
     uint8_t fan_config[MAX_FAN_COUNT];
-    uint8_t profiles[PROFILE_COUNT][DEVICE_COUNT];
+    int8_t profiles[PROFILE_COUNT][DEVICE_COUNT];
     uint8_t profile_flags[PROFILE_COUNT];
 } __attribute__((packed)) global_settings;
 

@@ -359,8 +359,11 @@ void load_profile(uint8_t n)
 {
     for(uint8_t d = 0; d < DEVICE_COUNT; d++)
     {
-        fetch_profile(current_profile[d], d, globals.profiles[n][d]);
-        globals.current_device_profile[d] = globals.profiles[n][d];
+        if(globals.profiles[n][d] > -1)
+        {
+            fetch_profile(current_profile[d], d, globals.profiles[n][d]);
+            globals.current_device_profile[d] = globals.profiles[n][d];
+        }
     }
     globals.profile_flags[globals.current_profile] = globals.profile_flags[n];
     save_globals();
