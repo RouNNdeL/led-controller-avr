@@ -8,7 +8,6 @@ typedef struct
 {
     uint8_t effect;
     uint8_t color_count;
-    uint8_t color_cycles;
     uint8_t timing[TIME_COUNT];
     uint8_t args[ARG_COUNT];
     uint8_t colors[COLOR_COUNT * 3];

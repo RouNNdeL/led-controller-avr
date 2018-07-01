@@ -233,11 +233,11 @@ void rotate_buf(uint8_t *leds, uint8_t led_count, uint16_t rotation_progress, ui
  * @return - a color to be displayed at a given frame
  */
 void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *times, uint8_t *args, uint8_t *colors,
-                   uint8_t color_count, uint8_t color_cycles, uint8_t grb)
+                   uint8_t color_count, uint8_t grb)
 {
     uint32_t sum = times[0] + times[1] + times[2] + times[3];
     uint32_t d_time = frame % sum;
-    uint8_t n_color = ((frame / sum / color_cycles) % color_count);
+    uint8_t n_color = ((frame / sum / args[ARG_COLOR_CYCLES]) % color_count);
     uint8_t m_color = (n_color == color_count - 1) ? 0 : n_color + 1;
     n_color *= 3;
     m_color *= 3;
@@ -330,12 +330,12 @@ void simple_effect(effect effect, uint8_t *color, uint32_t frame, uint16_t *time
  * @param color_count - how many colors are in use
  */
 void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t start_led, uint32_t frame, uint16_t *times,
-                    uint8_t *args, uint8_t *colors, uint8_t color_count, uint8_t color_cycles)
+                    uint8_t *args, uint8_t *colors, uint8_t color_count)
 {
     if(effect == BREATHE || effect == FADE || (effect == RAINBOW && (args[ARG_BIT_PACK] & RAINBOW_SIMPLE)))
     {
         uint8_t color[3];
-        simple_effect(effect, color, frame, times, args, colors, color_count, color_cycles, 1);
+        simple_effect(effect, color, frame, times, args, colors, color_count, 1);
         set_all_colors(leds, color[0], color[1], color[2], led_count, 0);
         return;
     }
@@ -344,7 +344,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         //<editor-fold desc="FILL, FILLING_FADE, RAINBOW">
         uint32_t sum = times[0] + times[1] + times[2] + times[3];
         uint32_t d_time = frame % sum;
-        uint8_t n_color = ((frame / sum / color_cycles) % (color_count / args[ARG_FILL_COLOR_COUNT])) *
+        uint8_t n_color = ((frame / sum / args[ARG_COLOR_CYCLES]) % (color_count / args[ARG_FILL_COLOR_COUNT])) *
                           args[ARG_FILL_COLOR_COUNT];
         uint8_t m_color = (n_color + args[ARG_FILL_COLOR_COUNT]) % color_count;
         n_color *= 3;
@@ -646,7 +646,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
 
         /* We need to know the current color batch to properly use ARG_SPECTRUM_MODES bit array */
         uint8_t run_count = color_count / args[ARG_SPECTRUM_COLOR_COUNT];
-        uint8_t run = (frame / sum / color_cycles) % run_count;
+        uint8_t run = (frame / sum / args[ARG_COLOR_CYCLES]) % run_count;
         uint8_t base_color = run * args[ARG_SPECTRUM_COLOR_COUNT];
         uint8_t n_color = times[TIME_ROTATION] ?
                           (frame % times[TIME_ROTATION]) * args[ARG_SPECTRUM_COLOR_COUNT] / times[TIME_ROTATION] : 0;
@@ -729,7 +729,7 @@ void digital_effect(effect effect, uint8_t *leds, uint8_t led_count, uint8_t sta
         uint32_t d_time = frame % sum;
         uint8_t c_count = effect == ROTATING ? led_count : args[ARG_PIECES_COLOR_COUNT];
         uint8_t c_colors[c_count * 3];
-        uint8_t n_color = ((frame / sum / color_cycles) % (color_count / args[ARG_PIECES_COLOR_COUNT])) *
+        uint8_t n_color = ((frame / sum / args[ARG_COLOR_CYCLES]) % (color_count / args[ARG_PIECES_COLOR_COUNT])) *
                           args[ARG_PIECES_COLOR_COUNT];
         uint8_t m_color = (n_color + args[ARG_PIECES_COLOR_COUNT]) % color_count;
         n_color *= 3;
@@ -813,18 +813,18 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint16_t times[] = {8, 0, 0, 24, 0};
         uint8_t args[] = {0, 0, 255, 0, 0};
 
-        digital_effect(BREATHE, fan_buf, 12, 2, frame + 8, times, args, colors + 9, 1, 1);
-        simple_effect(BREATHE, gpu_buf, frame + 8, times, args, colors + 9, 1, 1, 0);
-        simple_effect(BREATHE, pc_buf, frame + 8, times, args, colors + 9, 1, 1, 0);
+        digital_effect(BREATHE, fan_buf, 12, 2, frame + 8, times, args, colors + 9, 1);
+        simple_effect(BREATHE, gpu_buf, frame + 8, times, args, colors + 9, 0, 1);
+        simple_effect(BREATHE, pc_buf, frame + 8, times, args, colors + 9, 0, 1);
     }
     else if((frame -= 32) < 28)
     {
         uint16_t times1[] = {6, 0, 50, 0, 0};
-        uint8_t args1[] = {0, 0, 255, 0, 0};
+        uint8_t args1[] = {0, 0, 255, 0, 0, 2};
 
         set_color(pc_buf, 0, 0, 0, 0);
         set_color(gpu_buf, 0, 0, 0, 0);
-        digital_effect(BREATHE, fan_buf, 12, 2, frame, times1, args1, colors, 2, 1);
+        digital_effect(BREATHE, fan_buf, 12, 2, frame, times1, args1, colors, 1);
     }
     else if((frame -= 28) < 28)
     {
@@ -832,7 +832,7 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint8_t args[] = {0, 0, 255, 0, 0};
 
         set_color(pc_buf, 0, 0, 0, 0);
-        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1, 0);
+        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 0, 1);
         set_all_colors(fan_buf, 0, 0, 0, 12, 1);
     }
     else if((frame -= 28) < 28)
@@ -840,7 +840,7 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint16_t times[] = {6, 0, 50, 0, 0};
         uint8_t args[] = {0, 0, 255, 0, 0};
 
-        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1, 0);
+        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 0);
         set_color(gpu_buf, 0, 0, 0, 0);
         set_all_colors(fan_buf, 0, 0, 0, 12, 1);
     }
@@ -849,18 +849,18 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint16_t times[] = {6, 0, 50, 0, 0};
         uint8_t args[] = {0, 0, 255, 0, 0};
 
-        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1, 0);
-        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1, 0);
-        digital_effect(BREATHE, fan_buf, 12, 2, frame, times, args, colors, 1, 1);
+        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 0);
+        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 0);
+        digital_effect(BREATHE, fan_buf, 12, 2, frame, times, args, colors, 1);
     }
     else if((frame -= 28) < 112)
     {
         uint16_t times1[] = {0, 16, 0, 16, 0};
         uint8_t args1[] = {0, 20, 255, 0, 0};
 
-        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 1, 0);
-        simple_effect(BREATHE, gpu_buf, frame + 8, times1, args1, colors + 3, 2, 2, 0);
-        digital_effect(BREATHE, fan_buf, 12, 2, frame, times1, args1, colors, 2, 1);
+        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 0);
+        simple_effect(BREATHE, gpu_buf, frame + 8, times1, args1, colors + 3, 2, 0);
+        digital_effect(BREATHE, fan_buf, 12, 2, frame, times1, args1, colors, 2);
     }
     else if((frame -= 112) < 128)
     {
@@ -870,17 +870,17 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         uint8_t args2[] = {SMOOTH | DIRECTION, 1, 1, 0, 0};
 
         set_color(pc_buf, 0, 0, 0, 0);
-        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors + 3, 2, 2, 0);
-        digital_effect(FILL, fan_buf, 12, 2, frame, times2, args2, colors, 2, 1);
+        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors + 3, 2, 0);
+        digital_effect(FILL, fan_buf, 12, 2, frame, times2, args2, colors, 2);
     }
     else if((frame -= 128) < 128)
     {
         uint16_t times1[] = {16, 0, 8, 0, 0};
         uint8_t args1[] = {0, 0, 255, 0, 0};
 
-        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 1, 0);
-        simple_effect(BREATHE, gpu_buf, frame + 8, times1, args1, colors + 3, 2, 2, 0);
-        digital_effect(BREATHE, fan_buf, 12, 2, frame, times1, args1, colors, 2, 1);
+        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 0);
+        simple_effect(BREATHE, gpu_buf, frame + 8, times1, args1, colors + 3, 2, 0);
+        digital_effect(BREATHE, fan_buf, 12, 2, frame, times1, args1, colors, 2);
     }
     else if((frame -= 128) < 128)
     {
@@ -895,17 +895,17 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         args2[ARG_FILL_PIECE_DIRECTIONS2] = 0;
 
         set_color(pc_buf, 0, 0, 0, 0);
-        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors, 2, 2, 0);
-        digital_effect(FILL, fan_buf, 12, 2, frame, times2, args2, colors + 3, 2, 1);
+        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors, 2, 0);
+        digital_effect(FILL, fan_buf, 12, 2, frame, times2, args2, colors + 3, 2);
     }
     else if((frame -= 128) < 96)
     {
         uint16_t times1[] = {0, 16, 0, 16, 0};
         uint8_t args1[] = {0, 20, 255, 0, 0};
 
-        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 1, 0);
-        simple_effect(BREATHE, gpu_buf, frame + 8, times1, args1, colors + 3, 2, 2, 0);
-        digital_effect(BREATHE, fan_buf, 12, 2, frame, times1, args1, colors, 2, 1);
+        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 0);
+        simple_effect(BREATHE, gpu_buf, frame + 8, times1, args1, colors + 3, 2, 0);
+        digital_effect(BREATHE, fan_buf, 12, 2, frame, times1, args1, colors, 2);
     }
     else if((frame -= 96) < 128)
     {
@@ -919,9 +919,9 @@ uint8_t demo_music(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32_t
         args2[ARG_FILL_PIECE_DIRECTIONS1] = 0;
         args2[ARG_FILL_PIECE_DIRECTIONS2] = 0;
 
-        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 1, 0);
-        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors + 3, 2, 2, 0);
-        digital_effect(FILL, fan_buf, 12, 2, frame, times2, args2, colors, 2, 1);
+        simple_effect(BREATHE, pc_buf, frame + 16, times1, args1, colors + 6, 1, 0);
+        simple_effect(BREATHE, gpu_buf, frame + 16, times1, args1, colors + 3, 2, 0);
+        digital_effect(FILL, fan_buf, 12, 2, frame, times2, args2, colors, 2);
     }
     else
     { return 1; }
@@ -937,9 +937,9 @@ uint8_t demo_effects(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32
         uint16_t times[] = {256, 64, 0, 64, 0};
         uint8_t args[] = {0, 0, 255, 0, 0};
 
-        digital_effect(BREATHE, fan_buf, 12, 2, frame + 256, times, args, colors, 1, 1);
-        simple_effect(BREATHE, gpu_buf, frame + 128, times, args, colors + 3, 1, 1, 0);
-        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1, 0);
+        digital_effect(BREATHE, fan_buf, 12, 2, frame + 256, times, args, colors, 1);
+        simple_effect(BREATHE, gpu_buf, frame + 128, times, args, colors + 3, 1, 0);
+        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 0);
     }
     else if((frame -= 384) < 128)
     {
@@ -948,9 +948,9 @@ uint8_t demo_effects(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32
         uint16_t times[] = {0, 64, 0, 64, 0};
         uint8_t args[] = {0, 0, 255, 0, 0};
 
-        digital_effect(BREATHE, fan_buf, 12, 2, frame, times, args, colors, 1, 1);
-        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 1, 0);
-        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 1, 0);
+        digital_effect(BREATHE, fan_buf, 12, 2, frame, times, args, colors, 1);
+        simple_effect(BREATHE, gpu_buf, frame, times, args, colors + 3, 1, 0);
+        simple_effect(BREATHE, pc_buf, frame, times, args, colors + 6, 1, 0);
     }
     else if((frame -= 128) < 256)
     {
@@ -962,7 +962,7 @@ uint8_t demo_effects(uint8_t *fan_buf, uint8_t *pc_buf, uint8_t *gpu_buf, uint32
         set_color(pc_buf, 0, 0, 0, 0);
         set_color(gpu_buf, 0, 0, 0, 0);
 
-        digital_effect(PIECES, fan_buf, 12, 2, frame, times, args, colors, 4, 1);
+        digital_effect(PIECES, fan_buf, 12, 2, frame, times, args, colors, 4);
     }
     else
     { return 1; }

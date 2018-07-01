@@ -105,10 +105,10 @@ uint8_t gpu_buf[3];
 
 #if (COMPILE_EFFECTS != 0)
 #define simple(buf, n) simple_effect(current_profile[n].effect, buf, frame + frames[n][TIME_DELAY], frames[n],\
-current_profile[n].args, colors[n], current_profile[n].color_count, current_profile[n].color_cycles, 0)
+current_profile[n].args, colors[n], current_profile[n].color_count, 0)
 
 #define digital(buf, count, offset, n) digital_effect(current_profile[n].effect, buf, count, offset, frame + frames[n][TIME_DELAY], frames[n],\
-current_profile[n].args, colors[n], current_profile[n].color_count, current_profile[n].color_cycles)
+current_profile[n].args, colors[n], current_profile[n].color_count)
 #endif /* (COMPILE_EFFECTS != 0) */
 //</editor-fold>
 
