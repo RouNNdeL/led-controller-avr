@@ -7,9 +7,18 @@
 #define COMPILE_UART 1
 #define COMPILE_BUTTONS 1
 #define COMPILE_EFFECTS 1
-#define COMPILE_DEBUG 1 /* Allow pausing the effect and seeking frame by frame */
+#define COMPILE_DEBUG 0 /* Allow pausing the effect and seeking frame by frame */
 
 #define DEBUG_BUFFER_SIZE 26
+
+#define TRANSITION_FRAMES 50
+#define TRANSITION_QUICK_FRAMES 35
+
+#if TRANSITION_FRAMES <= 255 && TRANSITION_QUICK_FRAMES <= 255
+typedef uint8_t transition_t;
+#else
+typedef uint16_t transition_t;
+#endif
 
 #if (COMPILE_EFFECTS == 0 && COMPILE_DEMOS == 0 && COMPILE_CSGO == 0)
 #    warning "All intercations have been disabled, this state is undesirable in production"
@@ -32,7 +41,7 @@
 #define PROFILE_COUNT 8
 #define COLOR_COUNT 16
 #define DEVICE_COUNT 6
-#define ARG_COUNT 5
+#define ARG_COUNT 6
 #define TIME_COUNT 6
 
 #define FAN_LED_COUNT 12

@@ -40,6 +40,7 @@ typedef struct
 #define DEVICE_FLAG_ENABLED (1 << 0)
 #define DEVICE_FLAG_EFFECT_ENABLED (1 << 1)
 #define DEVICE_FLAG_PROFILE_UPDATED (1 << 2)
+#define DEVICE_FLAG_TRANSITION (1 << 3)
 
 /**
  * When set to 1 the strip functions like a loop, otherwise both sides function like one strip

@@ -58,6 +58,11 @@ global_settings globals = {
         2, 0,
         2, 2, 0
 };
+/* The first 3 bytes are the current color, the last 3 bytes are the old color to transition from */
+uint8_t color_converted[6 * DEVICE_COUNT] = {};
+
+volatile transition_t transition_frame[DEVICE_COUNT] = {0};
+transition_t transition_frames[DEVICE_COUNT];
 
 #define brightness(device, color) scale8(color, globals.brightness[device])
 #define save_globals() eeprom_update_block(&globals, &globals_addr, GLOBALS_LENGTH)
@@ -148,6 +153,22 @@ void backup_all_args()
     for(uint8_t i = 0; i < DEVICE_COUNT; ++i)
     {
         memcpy(backup_args[i], current_profile[i].args, ARG_COUNT);
+    }
+}
+
+void convert_simple_color_and_brightness()
+{
+    for(uint8_t d = 0; d < DEVICE_COUNT; ++d)
+    {
+        uint8_t index = d * 6;
+
+        /* Copy the now old color to its place (3 bytes after the new) */
+        memcpy(color_converted + index + 3, color_converted + index, 3);
+
+        uint8_t brightness = (globals.flags[d] & DEVICE_FLAG_ENABLED) ? globals.brightness[d] : 0;
+        set_color_manual(color_converted + index, color_brightness(brightness, color_from_buf(globals.color[d])));
+
+        globals.flags[d] |= DEVICE_FLAG_TRANSITION;
     }
 }
 
@@ -437,6 +458,14 @@ void init_eeprom()
 
     load_devices();
 #endif /* (COMPILE_EFFECTS !=0) */
+
+    convert_simple_color_and_brightness();
+    for(int d = 0; d < DEVICE_COUNT; ++d)
+    {
+        memcpy(color_converted + d * 6 + 3, color_converted + d * 6, 3);
+        globals.flags[d] &= ~DEVICE_FLAG_TRANSITION;
+        transition_frame[d] = 0;
+    }
 }
 
 #if (COMPILE_UART != 0)
@@ -534,6 +563,7 @@ void process_uart()
                     }
                     auto_increment = autoincrement_to_frames(globals.auto_increment);
                     convert_all_colors();
+                    convert_simple_color_and_brightness();
 
                     uart_transmit(RECEIVE_SUCCESS);
 
@@ -1049,6 +1079,24 @@ int main(void)
             {
 #endif /* (COMPILE_CSGO != 0) */
 
+                uint8_t simple_color[DEVICE_COUNT][3];
+                for(uint8_t d = 0; d < DEVICE_COUNT; ++d)
+                {
+                    uint8_t index = d * 6;
+                    cross_fade(simple_color[d], color_converted + index, 3, 0,
+                               transition_frame[d] * UINT8_MAX / TRANSITION_QUICK_FRAMES);
+                    simple_color[d][0] = actual_brightness(simple_color[d][0]);
+                    simple_color[d][1] = actual_brightness(simple_color[d][1]);
+                    simple_color[d][2] = actual_brightness(simple_color[d][2]);
+
+                    if(transition_frame[d] >= TRANSITION_QUICK_FRAMES && globals.flags[d] & DEVICE_FLAG_TRANSITION)
+                    {
+                        memcpy(color_converted + index + 3, color_converted + index, 3);
+                        globals.flags[d] &= ~DEVICE_FLAG_TRANSITION;
+                        transition_frame[d] = 0;
+                    }
+                }
+
                 if(globals.brightness[DEVICE_INDEX_PC] && globals.flags[DEVICE_INDEX_PC] & DEVICE_FLAG_ENABLED &&
                    globals.flags[DEVICE_INDEX_PC] & DEVICE_FLAG_EFFECT_ENABLED)
                 {
@@ -1056,8 +1104,10 @@ int main(void)
                     simple(pc_buf, DEVICE_INDEX_PC);
 #endif
                 }
-                else if(globals.brightness[DEVICE_INDEX_PC] && globals.flags[DEVICE_INDEX_PC] & DEVICE_FLAG_ENABLED)
-                    set_color(pc_buf, 0, color_from_buf(globals.color[DEVICE_INDEX_PC]));
+                else if(globals.brightness[DEVICE_INDEX_PC] && (globals.flags[DEVICE_INDEX_PC] & DEVICE_FLAG_ENABLED ||
+                                                                globals.flags[DEVICE_INDEX_PC] &
+                                                                DEVICE_FLAG_TRANSITION))
+                    set_color(pc_buf, 0, color_from_buf(simple_color[DEVICE_INDEX_PC]));
                 else
                     set_color(pc_buf, 0, COLOR_BLACK);
 
@@ -1068,26 +1118,29 @@ int main(void)
                     simple(gpu_buf, DEVICE_INDEX_GPU);
 #endif
                 }
-                else if(globals.brightness[DEVICE_INDEX_GPU] && globals.flags[DEVICE_INDEX_GPU] & DEVICE_FLAG_ENABLED)
-                    set_color(gpu_buf, 0, color_from_buf(globals.color[DEVICE_INDEX_GPU]));
+                else if(globals.brightness[DEVICE_INDEX_GPU] &&
+                        (globals.flags[DEVICE_INDEX_GPU] & DEVICE_FLAG_ENABLED ||
+                         globals.flags[DEVICE_INDEX_GPU] & DEVICE_FLAG_TRANSITION))
+                    set_color(gpu_buf, 0, color_from_buf(simple_color[DEVICE_INDEX_GPU]));
                 else
                     set_color(gpu_buf, 0, COLOR_BLACK);
 
-                for(uint8_t i = 0; i < globals.fan_count; ++i)
+                for(uint8_t f = 0; f < globals.fan_count; ++f)
                 {
-                    uint8_t *index = fan_buf + FAN_LED_COUNT * i * 3;
-                    if(globals.brightness[DEVICE_INDEX_FAN(i)] &&
-                       globals.flags[DEVICE_INDEX_FAN(i)] & DEVICE_FLAG_ENABLED &&
-                       globals.flags[DEVICE_INDEX_FAN(i)] & DEVICE_FLAG_EFFECT_ENABLED)
+                    uint8_t *index = fan_buf + FAN_LED_COUNT * f * 3;
+                    if(globals.brightness[DEVICE_INDEX_FAN(f)] &&
+                       globals.flags[DEVICE_INDEX_FAN(f)] & DEVICE_FLAG_ENABLED &&
+                       globals.flags[DEVICE_INDEX_FAN(f)] & DEVICE_FLAG_EFFECT_ENABLED)
                     {
 #if (COMPILE_EFFECTS != 0)
-                        digital(index, FAN_LED_COUNT, globals.fan_config[i], DEVICE_INDEX_FAN(i));
+                        digital(index, FAN_LED_COUNT, globals.fan_config[f], DEVICE_INDEX_FAN(f));
 #endif
                     }
-                    else if(globals.brightness[DEVICE_INDEX_FAN(i)] &&
-                            globals.flags[DEVICE_INDEX_FAN(i)] & DEVICE_FLAG_ENABLED)
+                    else if(globals.brightness[DEVICE_INDEX_FAN(f)] &&
+                            (globals.flags[DEVICE_INDEX_FAN(f)] & DEVICE_FLAG_ENABLED ||
+                             globals.flags[DEVICE_INDEX_FAN(f)] & DEVICE_FLAG_TRANSITION))
                     {
-                        set_all_colors(index, color_from_buf(globals.color[DEVICE_INDEX_FAN(i)]), FAN_LED_COUNT, 1);
+                        set_all_colors(index, color_from_buf(simple_color[DEVICE_INDEX_FAN(f)]), FAN_LED_COUNT, 1);
                     }
                     else
                     {
@@ -1130,10 +1183,11 @@ int main(void)
 #endif
                     }
                     else if(globals.brightness[DEVICE_INDEX_STRIP] &&
-                            globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_ENABLED)
+                            (globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_ENABLED ||
+                             globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_TRANSITION))
                     {
-                        set_all_colors(strip_buf, color_from_buf(globals.color[DEVICE_INDEX_STRIP]), STRIP_LED_COUNT,
-                                       1);
+                        set_all_colors(strip_buf, color_from_buf(simple_color[DEVICE_INDEX_STRIP]),
+                                       STRIP_LED_COUNT, 1);
                     }
                     else
                     {
@@ -1244,9 +1298,11 @@ int main(void)
 #endif
                 }
                 else if(globals.brightness[DEVICE_INDEX_STRIP] &&
-                        globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_ENABLED)
+                        (globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_ENABLED ||
+                         globals.flags[DEVICE_INDEX_STRIP] & DEVICE_FLAG_TRANSITION))
                 {
-                    set_all_colors(strip_buf, color_from_buf(globals.color[DEVICE_INDEX_STRIP]), STRIP_LED_COUNT, 1);
+                    set_all_colors(strip_buf, color_from_buf(simple_color[DEVICE_INDEX_STRIP]),
+                                   STRIP_LED_COUNT, 1);
                 }
                 else
                 {
@@ -1294,6 +1350,13 @@ ISR(TIMER3_COMPA_vect)
 #endif /* (COMPILE_DEBUG != 0) */
     frame++;
     flags |= FLAG_NEW_FRAME;
+    for(int d = 0; d < DEVICE_COUNT; ++d)
+    {
+        if(globals.flags[d] & DEVICE_FLAG_TRANSITION)
+        {
+            transition_frame[d]++;
+        }
+    }
 #if (COMPILE_DEBUG != 0)
     }
 #endif /* (COMPILE_DEBUG != 0) */
