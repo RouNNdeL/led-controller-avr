@@ -1085,10 +1085,6 @@ int main(void)
                     uint8_t index = d * 6;
                     cross_fade(simple_color[d], color_converted + index, 3, 0,
                                transition_frame[d] * UINT8_MAX / TRANSITION_QUICK_FRAMES);
-                    simple_color[d][0] = actual_brightness(simple_color[d][0]);
-                    simple_color[d][1] = actual_brightness(simple_color[d][1]);
-                    simple_color[d][2] = actual_brightness(simple_color[d][2]);
-
                     if(transition_frame[d] >= TRANSITION_QUICK_FRAMES && globals.flags[d] & DEVICE_FLAG_TRANSITION)
                     {
                         memcpy(color_converted + index + 3, color_converted + index, 3);
