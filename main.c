@@ -156,7 +156,7 @@ void backup_all_args()
     }
 }
 
-void convert_simple_color_and_brightness()
+void convert_simple_color_and_brightness(uint8_t quick)
 {
     for(uint8_t d = 0; d < DEVICE_COUNT; ++d)
     {
@@ -169,6 +169,7 @@ void convert_simple_color_and_brightness()
         set_color_manual(color_converted + index, color_brightness(brightness, color_from_buf(globals.color[d])));
 
         globals.flags[d] |= DEVICE_FLAG_TRANSITION;
+        transition_frames[d] = quick ? TRANSITION_QUICK_FRAMES : TRANSITION_FRAMES;
     }
 }
 
@@ -459,7 +460,7 @@ void init_eeprom()
     load_devices();
 #endif /* (COMPILE_EFFECTS !=0) */
 
-    convert_simple_color_and_brightness();
+    convert_simple_color_and_brightness(1);
     for(int d = 0; d < DEVICE_COUNT; ++d)
     {
         memcpy(color_converted + d * 6 + 3, color_converted + d * 6, 3);
@@ -557,7 +558,7 @@ void process_uart()
 
                     save_globals();
                     convert_all_colors();
-                    convert_simple_color_and_brightness();
+                    convert_simple_color_and_brightness(1);
 
                     uart_transmit(RECEIVE_SUCCESS);
 
@@ -590,7 +591,7 @@ void process_uart()
                     }
                     auto_increment = autoincrement_to_frames(globals.auto_increment);
                     convert_all_colors();
-                    convert_simple_color_and_brightness();
+                    convert_simple_color_and_brightness(0);
 
                     uart_transmit(RECEIVE_SUCCESS);
 
@@ -1111,8 +1112,8 @@ int main(void)
                 {
                     uint8_t index = d * 6;
                     cross_fade(simple_color[d], color_converted + index, 3, 0,
-                               transition_frame[d] * UINT8_MAX / TRANSITION_QUICK_FRAMES);
-                    if(transition_frame[d] >= TRANSITION_QUICK_FRAMES && globals.flags[d] & DEVICE_FLAG_TRANSITION)
+                               transition_frame[d] * UINT8_MAX / transition_frames[d]);
+                    if(transition_frame[d] >= transition_frames[d] && globals.flags[d] & DEVICE_FLAG_TRANSITION)
                     {
                         memcpy(color_converted + index + 3, color_converted + index, 3);
                         globals.flags[d] &= ~DEVICE_FLAG_TRANSITION;
