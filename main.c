@@ -539,6 +539,33 @@ void process_uart()
                 //</editor-fold>
                 break;
             }
+            case QUICK_SAVE:
+            {
+                //<editor-fold desc="Save globals">
+                if(uart_buffer_length >= DEVICE_COUNT * (3 + 1 + 1))
+                {
+                    /* Lock the buffer before reading it */
+                    uart_flags |= UART_FLAG_LOCK;
+                    for(int d = 0; d < DEVICE_COUNT; ++d)
+                    {
+                        uint8_t index = d * 5;
+                        globals.flags[d] = uart_buffer[index];
+                        globals.brightness[d] = uart_buffer[index + 1];
+                        memcpy(&globals.color[d], (const void *) (uart_buffer + index + 2), 3);
+                    }
+                    uart_flags &= ~UART_FLAG_LOCK;
+
+                    save_globals();
+                    convert_all_colors();
+                    convert_simple_color_and_brightness();
+
+                    uart_transmit(RECEIVE_SUCCESS);
+
+                    reset_uart();
+                }
+                //</editor-fold>
+                break;
+            }
             case SAVE_GLOBALS:
             {
                 //<editor-fold desc="Save globals">
@@ -1365,7 +1392,12 @@ ISR(USART0_RX_vect)
     uint8_t val = UDR0;
     if(!(uart_flags & UART_FLAG_RECEIVE))
     {
+        if(val == QUICK_SAVE)
+        {
+            uart_flags |= UART_FLAG_RECEIVE;
+        }
         uart_control = val;
+
     }
     else if(uart_buffer_length < sizeof(uart_buffer) && !(uart_flags & UART_FLAG_LOCK))
     {
